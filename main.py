@@ -3,4 +3,5 @@ from HTTPRequest import HTTPRequest
 from HTTPResponse import HTTPResponse
 
 if __name__ == "__main__":
-    pass
+    server = HTTPServer()
+    server.run()

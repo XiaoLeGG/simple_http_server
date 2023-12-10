@@ -1,6 +1,7 @@
 import os
 import datetime
 import random
+import socket
 
 class HTTPResponse:
 
@@ -9,32 +10,36 @@ class HTTPResponse:
     @classmethod
     def build(
         cls,
-        version="1.1",
-        status_code=200,
-        reason="OK",
-        body=("text", "Hello World!"),
-        content_type="text/plain",
-        keep_alive=True,
-        timeout=5,
-        max=1000,
-        set_cookie=None,
-        ranges=None,
-        server="CS305 HTTP Server/1.0",
+        version : str="1.1",
+        status_code : int=200,
+        reason : str="OK",
+        body : tuple=("empty", None),
+        content_type : str=None,
+        keep_alive : bool=True,
+        timeout : int=5,
+        max : int=1000,
+        set_cookie : str=None,
+        ranges : list=None,
+        server : str="CS305 HTTP Server/1.0",
+        headers : dict[str, str]=None,
         **kwargs
         ) -> "HTTPResponse":
 
-        headers = dict()
-        headers["Content-Type"] = content_type
+        if headers is None:
+            headers = dict()
+        
         headers["Connection"] = "keep-alive" if keep_alive else "close"
         headers["Server"] = server
+        if content_type:
+            headers["Content-Type"] = content_type
         if keep_alive:
             headers["Keep-Alive"] = f"timeout={timeout}; max={max}"
         if set_cookie:
             headers["Set-Cookie"] = set_cookie
-        return cls(version, status_code, reason, headers, body, range)
+        return cls(version, status_code, reason, headers, body, ranges)
 
 
-    def __init__(self, version, status_code, reason, headers, body, ranges):
+    def __init__(self, version : str, status_code : int, reason : str, headers : dict, body : bytes, ranges : list):
         self.status_code = status_code
         self.reason = reason
         self.headers = headers
@@ -54,19 +59,19 @@ class HTTPResponse:
     def get_body(self) -> tuple:
         return self.body
 
-    def set_status_code(self, status_code) -> None:
+    def set_status_code(self, status_code : int):
         self.status_code = status_code
 
-    def set_reason(self, reason) -> None:
+    def set_reason(self, reason : str):
         self.reason = reason
 
-    def set_headers(self, headers) -> None:
+    def set_headers(self, headers : dict):
         self.headers = headers
 
-    def set_body(self, body) -> None:
+    def set_body(self, body):
         self.body = body
 
-    def send(self, conn) -> None:
+    def send(self, conn : socket.socket):
         response_builder = []
         response_builder.append(f"HTTP/{self.version} {self.status_code} {self.reason}\r\n")
         
