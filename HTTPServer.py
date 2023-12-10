@@ -15,6 +15,7 @@ class HTTPServer:
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind((self.host, self.port))
         self.socket.listen(parallel)
+        utils.init_sql()
 
     def run(self):
         print(f"HTTP Server is running on {self.host}:{self.port}...")
