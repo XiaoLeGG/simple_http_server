@@ -1,9 +1,18 @@
 import sqlite3 as sql
 import os
-import uuid
+import uuid as ud
+import pytz
+from datetime import datetime, timedelta
+from jinja2 import Template
 
 user_data_file = "user_data.db"
 cookie_file = "user_data.db"
+
+def get_current_time() -> datetime:
+    current_time = datetime.now()
+    gmt_timezone = pytz.timezone('GMT')
+    current_time_gmt = current_time.astimezone(gmt_timezone)
+    return current_time_gmt
 
 def init_sql():
     conn = sql.connect(user_data_file)
@@ -18,23 +27,45 @@ def init_sql():
     conn.commit()
     conn.close()
 
-def verify_user(uuid : uuid.UUID, password : str) -> bool:
+def verify_user(uuid : ud.UUID, password : str) -> bool:
     conn = sql.connect(user_data_file)
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE uuid = ? AND password = ?", (uuid, password))
+    cursor.execute("SELECT * FROM users WHERE uuid = ? AND password = ?", (str(uuid), password))
     if cursor.fetchone() is None:
         return False
     else:
         return True
+    
+def get_root_dir() -> str:
+    return "./"
 
-def create_user(uuid : uuid.UUID, user_name : str, password : str):
+def get_data_dir() -> str:
+    data_dir = "./data"
+    if not os.path.exists(data_dir):
+        os.mkdir(data_dir)
+    return data_dir
+
+def generate_folder(user_name : str):
+    folder_name = os.path.join(get_data_dir(), user_name)
+    if not os.path.exists(folder_name):
+        os.mkdir(folder_name)
+    else:
+        print(os.path.abspath(folder_name))
+    return folder_name
+def create_user(user_name : str, password : str) -> ud.UUID:
+    exist_uuid = get_user_by_name(user_name)
+    if exist_uuid is not None:
+        raise Exception("User already exists.")
+    uuid = ud.uuid4()
+    generate_folder(user_name.lower())
     conn = sql.connect(user_data_file)
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO users VALUES (?, ?, ?)", (uuid, user_name.lower(), password))
+    cursor.execute("INSERT INTO users VALUES (?, ?, ?)", (str(uuid), user_name.lower(), password))
     conn.commit()
     conn.close()
+    return uuid
 
-def get_user_by_name(user_name : str) -> uuid.UUID:
+def get_user_by_name(user_name : str) -> ud.UUID:
     conn = sql.connect(user_data_file)
     cursor = conn.cursor()
     cursor.execute("SELECT uuid FROM users WHERE name = ?", (user_name.lower(),))
@@ -42,22 +73,64 @@ def get_user_by_name(user_name : str) -> uuid.UUID:
     if result is None:
         return None
     else:
-        return uuid.UUID(result[0])
+        return ud.UUID(result[0])
 
-def get_user_by_cookie(cookie : uuid.UUID) -> uuid.UUID:
-    conn = sql.connect(cookie_file)
+def get_user_name_by_uuid(uuid : ud.UUID) -> str:
+    conn = sql.connect(user_data_file)
     cursor = conn.cursor()
-    cursor.execute("SELECT uuid FROM cookies WHERE cookie = ?", (cookie,))
+    cursor.execute("SELECT name FROM users WHERE uuid = ?", (str(uuid),))
     result = cursor.fetchone()
     if result is None:
         return None
     else:
-        return uuid.UUID(result[0])
+        return result[0]
 
-def set_cookie(uuid : uuid.UUID, cookie : uuid.UUID, persist_time : int):
+def get_user_by_cookie(cookie : ud.UUID) -> ud.UUID:
     conn = sql.connect(cookie_file)
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO cookies VALUES (?, ?, datetime('now', '+{} seconds'))".format(persist_time * 60 * 60 * 24), (cookie, uuid))
+    cursor.execute("SELECT uuid, expire_time FROM cookies WHERE cookie = ?", (str(cookie),))
+    result = cursor.fetchone()
+    if result is None:
+        return None
+    else:
+        expire_time = datetime.strptime(result[1], "%Y-%m-%d %H:%M:%S")
+        current_time = get_current_time().replace(tzinfo=None)
+        if expire_time < current_time:
+            clean_cookie_by_cookie(cookie)
+            return None
+        return ud.UUID(result[0])
+    
+def get_cookie_by_user(uuid : ud.UUID) -> ud.UUID:
+    conn = sql.connect(cookie_file)
+    cursor = conn.cursor()
+    cursor.execute("SELECT cookie, expire_time FROM cookies WHERE uuid = ?", (str(uuid),))
+    result = cursor.fetchone()
+    if result is None:
+        return None
+    else:
+        expire_time = datetime.strptime(result[1], "%Y-%m-%d %H:%M:%S")
+        current_time = get_current_time().replace(tzinfo=None)
+        if expire_time < current_time:
+            clean_cookie_by_user(uuid)
+            return None
+        return ud.UUID(result[0])
+    
+def generate_cookie(uuid : ud.UUID, persist_time : int=120) -> ud.UUID:
+    cookie = ud.uuid4()
+    set_cookie(uuid, cookie, persist_time)
+    return cookie
+
+def resign_cookie(cookie : ud.UUID, persist_time: int):
+    conn = sql.connect(cookie_file)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE cookies SET expire_time = datetime('now', '+{} seconds') WHERE cookie = ?".format(persist_time), (str(cookie),))
+    conn.commit()
+    conn.close()
+
+def set_cookie(uuid : ud.UUID, cookie : ud.UUID, persist_time : int):
+    conn = sql.connect(cookie_file)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO cookies VALUES (?, ?, datetime('now', '+{} seconds'))".format(persist_time), (str(cookie), str(uuid)))
     conn.commit()
     conn.close()
 
@@ -68,36 +141,94 @@ def clean_cookie():
     conn.commit()
     conn.close()
 
-def clean_cookie_by_user(uuid : uuid.UUID):
+def clean_cookie_by_user(uuid : ud.UUID):
     conn = sql.connect(cookie_file)
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM cookies WHERE uuid = ?", (uuid,))
+    cursor.execute("DELETE FROM cookies WHERE uuid = ?", (str(uuid),))
     conn.commit()
     conn.close()
 
-def clean_cookie_by_cookie(cookie : uuid.UUID):
+def clean_cookie_by_cookie(cookie : ud.UUID):
     conn = sql.connect(cookie_file)
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM cookies WHERE cookie = ?", (cookie,))
+    cursor.execute("DELETE FROM cookies WHERE cookie = ?", (str(cookie),))
     conn.commit()
     conn.close()
 
-def file_explore_html(dir : str) -> str:
-    
-    if not os.path.exists(dir):
-        return "<html><body><h1>File Not Exists</h1></body></html>"
-    
-    # Get the list of files and directories in the current directory
+def file_explore_html(dir : str, user_name : str, abs_dir : str, uuid : ud.UUID=None, sustech_http : bool=False) -> str:
 
+    abs_files = os.listdir(abs_dir)
 
-    files = os.listdir(dir)
+    if sustech_http:
+        files = []
+        for file in abs_files:
+            file_name = os.path.basename(file)
+            if os.path.isdir(file):
+                files.append(file_name + "/")
+            else:
+                files.append(file_name)
+        return str(files)
     
-    # Generate the HTML for the file explorer
-    html = "<html><body>"
-    html += "<h1>File Explorer</h1>"
-    html += "<ul>"
-    for file in files:
-        html += f"<li>{file}</li>"
-    html += "</ul>"
-    html += "</body></html>"
-    return html
+    with open("view_files.html", "r", encoding="utf-8") as template_file:
+        template_content = template_file.read()
+
+    files = []
+    for file in abs_files:
+        file_name = os.path.basename(file)
+        if os.path.isdir(os.path.join(abs_dir, file)):
+            files.append((dir + "/" + file_name + "/", file_name + "/"))
+        else:
+            files.append((dir + "/" + file_name, file_name))
+
+    template = Template(template_content)
+    rendered_html = template.render(files=files, user_name=user_name, current_path=dir)
+
+    return rendered_html
+
+def filter_path(path : str) -> str:
+    path = path.replace("//", "/")
+
+def normalize_and_validate_path(base_path : str, request_uri : str) -> str:
+    normalized_path = os.path.normpath(os.path.join(base_path, request_uri))
+    if os.path.commonprefix([normalized_path, base_path]) != base_path:
+        return None
+
+    return normalized_path
+
+def unquote_uri(s):
+    decoded_bytes = bytes()
+    i = 0
+    while i < len(s):
+        if s[i] == '%':
+            decoded_bytes += int(s[i + 1:i + 3], 16).to_bytes(1, 'big')
+            i += 3
+        else:
+            decoded_bytes += s[i].encode('utf-8')
+            i += 1
+
+    return decoded_bytes.decode('utf-8')
+
+def parse_ranges(ranges : str, file_size : int) -> list[tuple]:
+    ranges = ranges[len("bytes="):]
+    ranges = ranges.split(",")
+    result = []
+    for _range in ranges:
+        if _range.startswith("-"):
+            end = int(_range[1:])
+            start = file_size - end
+            end = file_size - 1
+        elif _range.endswith("-"):
+            start = int(_range[:-1])
+            end = file_size - 1
+        else:
+            start, end = _range.split("-")
+            start = int(start)
+            end = int(end)
+        if start > end:
+            return None
+        if start >= file_size:
+            return None
+        if end >= file_size:
+            return None
+        result.append((start, end))
+    return result

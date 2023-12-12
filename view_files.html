@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ user_name }}'s Files</title>
+</head>
+<body>
+    <h1>{{ current_path }}</h1>
+    <ul>
+        {% for file in files %}
+            <li><a href="{{ file[0] }}" download="{{ file[1] }}">{{ file[1] }}</a></li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

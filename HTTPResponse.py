@@ -1,11 +1,18 @@
 import os
-import datetime
 import random
 import socket
+import enum
+import utils
+
+CHUNK_FILE_SIZE = 1024 * 1024 * 10
+
+class HTTPBodyType(enum.Enum):
+    EMPTY = "empty"
+    TEXT = "text"
+    FILE = "file"
 
 class HTTPResponse:
 
-    _chunked_file_size = 1024
 
     @classmethod
     def build(
@@ -13,10 +20,10 @@ class HTTPResponse:
         version : str="1.1",
         status_code : int=200,
         reason : str="OK",
-        body : tuple=("empty", None),
+        body : tuple[HTTPBodyType,]=(HTTPBodyType.EMPTY, None),
         content_type : str=None,
-        keep_alive : bool=True,
-        timeout : int=5,
+        keep_alive : bool=False,
+        timeout : int=20,
         max : int=1000,
         set_cookie : str=None,
         ranges : list=None,
@@ -26,9 +33,9 @@ class HTTPResponse:
         ) -> "HTTPResponse":
 
         if headers is None:
-            headers = dict()
-        
-        headers["Connection"] = "keep-alive" if keep_alive else "close"
+            headers = dict()    
+
+        headers["Connection"] = "Keep-Alive" if keep_alive else "Close"
         headers["Server"] = server
         if content_type:
             headers["Content-Type"] = content_type
@@ -39,7 +46,7 @@ class HTTPResponse:
         return cls(version, status_code, reason, headers, body, ranges)
 
 
-    def __init__(self, version : str, status_code : int, reason : str, headers : dict, body : bytes, ranges : list):
+    def __init__(self, version : str, status_code : int, reason : str, headers : dict, body : tuple, ranges : list):
         self.status_code = status_code
         self.reason = reason
         self.headers = headers
@@ -68,85 +75,89 @@ class HTTPResponse:
     def set_headers(self, headers : dict):
         self.headers = headers
 
-    def set_body(self, body):
+    def set_body(self, body : tuple):
         self.body = body
 
-    def send(self, conn : socket.socket):
+    
+    def _build_headers(self) -> str:
         response_builder = []
         response_builder.append(f"HTTP/{self.version} {self.status_code} {self.reason}\r\n")
         
         for key, value in self.headers.items():
             response_builder.append(f"{key}: {value}\r\n")
-        date = datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT  ")
-        response_builder.append(f"Date: {date}\r\n")
+        response_builder.append("\r\n")
+        return "".join(response_builder)
 
-        if (self.body[0] == "empty"):
-            response_builder.append("Content-Length: 0\r\n")
-            response_builder.append("\r\n")
-            for line in response_builder:
-                conn.sendall(line.encode())
+    def send(self, conn : socket.socket):
+        
+        date = utils.get_current_time().strftime("%a, %d %b %Y %H:%M:%S GMT")
+        self.headers["Date"] = date
+
+        if (self.body[0] == HTTPBodyType.EMPTY):
+            self.headers["Content-Length"] = 0
+            conn.sendall(self._build_headers().encode())
             return
         
-        if (self.body[0] == "text"):
-            response_builder.append(f"Content-Length: {len(self.body[1])}\r\n")
-            response_builder.append("\r\n")
-            response_builder.append(self.body[1] + "\r\n")
-            response_builder.append("\r\n")
-            for line in response_builder:
-                conn.sendall(line.encode())
+        if (self.body[0] == HTTPBodyType.TEXT):
+            if isinstance(self.body[1], str):
+                self.body = (self.body[0], self.body[1].encode())
+            self.headers["Content-Length"] = len(self.body[1])
+            conn.sendall(self._build_headers().encode())
+            conn.sendall(self.body[1] + b"\r\n\r\n")
             return
 
-        if (self.body[0] == "file"):
+        if (self.body[0] == HTTPBodyType.FILE):
             file_path = self.body[1]
             with open(file_path, "rb") as file:
                 file_size = os.path.getsize(file_path)
 
                 # range transfer
                 if self.ranges:
-                    response_builder.append("Accept-Ranges: bytes\r\n")
+                    self.status_code = 206
+                    self.reason = "Partial Content"
+                    self.headers["Accept-Ranges"] = "bytes"
                     boundary = "CS305v" + "{:05}".format(random.randint(0, 99999))
-                    for line in response_builder:
-                        if line.startswith("Content-Type"):
-                            conn.sendall(b"Content-Type: multipart/byteranges; boundary=" + boundary.encode() + "\r\n".encode())
-                        else:
-                            conn.sendall(line.encode())
-                    conn.sendall(b"\r\n")
+                    origin_content_type = self.headers["Content-Type"]
+                    self.headers["Content-Type"] = "multipart/byteranges; boundary=" + boundary
+                    conn.sendall(self._build_headers().encode())
                     for start, end in self.ranges:
-                        conn.sendall(b"--" + boundary.encode() + "\r\n".encode())
-                        conn.sendall("Content-Type: {type}".format(type=self.headers["Content-Type"]).encode() + "\r\n".encode())
-                        conn.sendall("Content-Range: bytes {start}-{end}/{size}".format(start=start, end=end, size=file_size).encode() + "\r\n".encode())
-                        conn.sendall("Content-Length: {length}".format(length=end - start + 1).encode() + "\r\n".encode())                            
+                        conn.sendall(b"--" + boundary.encode() + b"\r\n")
+                        conn.sendall(f"Content-Type: {origin_content_type}".encode() + b"\r\n")
+                        conn.sendall(f"Content-Range: bytes {start}-{end}/{file_size}".encode() + b"\r\n")
+                        conn.sendall(f"Content-Length: {end - start + 1}".encode() + b"\r\n")                            
                         file.seek(start)
                         conn.sendall(b"\r\n")
                         data = file.read(end - start + 1)
                         conn.sendall(data)
-                        conn.sendall(b"\r\n")
-                    conn.sendall(b"--" + boundary.encode() + "--\r\n\r\n".encode())
+                        conn.sendall(b"\r\n\r\n")
+                    conn.sendall(b"--" + boundary.encode() + b"--\r\n")
                     return
                 else:
                     
                     # Transfer-Encoding
-                    if file_size > self._chunked_file_size:
-                        response_builder.append("Transfer-Encoding: chunked\r\n")
-                        for line in response_builder:
-                            conn.sendall(line.encode())
-                        conn.sendall(b"\r\n")
+                    if file_size > CHUNK_FILE_SIZE:
+                        # response_builder.append(f"Content-Length: 0\r\n")
+                        self.headers["Transfer-Encoding"] = "chunked"
+                        headers_str = self._build_headers()
+                        conn.sendall(headers_str.encode())
+                        print(headers_str)
+                        
                         while True:
-                            data = file.read(self._chunked_file_size)
+                            data = file.read(CHUNK_FILE_SIZE)
                             if not data:
                                 break
-                            conn.sendall(f"{len(data)}\r\n".encode())
+                            conn.sendall(f"{len(data):X}\r\n".encode())
                             conn.sendall(data)
                             conn.sendall(b"\r\n")
+                            if len(data) < CHUNK_FILE_SIZE:
+                                break
                         conn.sendall(b"0\r\n\r\n")
                         return
                     else:
 
                         # Simple File Transfer
-                        response_builder.append(f"Content-Length: {file_size}\r\n")
-                        for line in response_builder:
-                            conn.sendall(line.encode())
-                        conn.sendall(b"\r\n")
+                        self.headers["Content-Length"] = file_size
+                        conn.sendall(self._build_headers().encode())
                         conn.sendall(file.read())
                         conn.sendall(b"\r\n\r\n")
                         return
