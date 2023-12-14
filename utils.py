@@ -49,8 +49,6 @@ def generate_folder(user_name : str):
     folder_name = os.path.join(get_data_dir(), user_name)
     if not os.path.exists(folder_name):
         os.mkdir(folder_name)
-    else:
-        print(os.path.abspath(folder_name))
     return folder_name
 
 def create_user(user_name : str, password : str) -> ud.UUID:
@@ -156,8 +154,22 @@ def clean_cookie_by_cookie(cookie : ud.UUID):
     conn.commit()
     conn.close()
 
-def file_explore_html(dir : str, user_name : str, abs_dir : str, uuid : ud.UUID=None, sustech_http : bool=False) -> str:
+login_template = None
 
+def login_html():
+    global login_template
+    if login_template is None:
+        with open("index.html", "r", encoding="utf-8") as template_file:
+            template_content = template_file.read()
+        login_template = Template(template_content)
+    rendered_html = login_template.render()
+    return rendered_html
+
+
+file_explore_template = None
+
+def file_explore_html(dir : str, user_name : str, abs_dir : str, uuid : ud.UUID=None, sustech_http : bool=False) -> str:
+    global file_explore_template
     abs_files = os.listdir(abs_dir)
 
     if sustech_http:
@@ -169,10 +181,10 @@ def file_explore_html(dir : str, user_name : str, abs_dir : str, uuid : ud.UUID=
             else:
                 files.append(file_name)
         return str(files)
-    
-    with open("view_files.html", "r", encoding="utf-8") as template_file:
-        template_content = template_file.read()
-
+    if file_explore_template is None:
+        with open("view_files.html", "r", encoding="utf-8") as template_file:
+            template_content = template_file.read()
+        file_explore_template = Template(template_content)
     files = []
 
     if os.path.dirname(dir) != "/":
@@ -187,8 +199,8 @@ def file_explore_html(dir : str, user_name : str, abs_dir : str, uuid : ud.UUID=
     
     files.sort(key=lambda x: (not x[2], x[1]))
 
-    template = Template(template_content)
-    rendered_html = template.render(files=files, user_name=user_name, current_path=dir)
+    
+    rendered_html = file_explore_template.render(files=files, user_name=user_name, current_path=dir)
 
     return rendered_html
 

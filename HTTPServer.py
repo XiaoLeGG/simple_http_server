@@ -13,15 +13,18 @@ import tempfile
 
 UPLOAD_SPEED = 1024 * 1024 * 100
 
+
 class HTTPServer:
 
-    def __init__(self, host : str = "localhost", port : int = 8080, parallel : int = 5, timeout : int = 10, cookie_persist_time : int=3600):
+    def __init__(self, host: str = "localhost", port: int = 8080, parallel: int = 5, timeout: int = 10, cookie_persist_time: int = 3600, debug: bool = False, server: str = "CS305 HTTP Server/1.0"):
         self.log = Log(
             f"logs/log_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
         self.host = host
         self.port = port
+        self.debug = debug
         self.timeout = timeout
         self.parallel = parallel
+        self.server = server
         self.cookie_persist_time = cookie_persist_time
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -32,7 +35,7 @@ class HTTPServer:
 
     def run(self):
         self.log.log(
-            LogLevel.INFO, f"HTTP Server is running on {self.host}:{self.port}...")
+            LogLevel.INFO, f"{self.server} is running on {self.host}:{self.port}...")
         while True:
             conn, addr = self.socket.accept()
             new_thread = threading.Thread(
@@ -47,23 +50,23 @@ class HTTPServer:
         except socket.timeout:
             self.log.log(
                 LogLevel.INFO, f"Timeout from {conn.getpeername()[0]}:{conn.getpeername()[1]}")
-            return HTTPResponse.build(status_code=200,
+            return HTTPResponse.build(server=self.server, status_code=200,
                                       reason="Timeout Closed",
                                       keep_alive=False)
         if not data:
             self.log.log(
                 LogLevel.INFO, f"Empty Request from {conn.getpeername()[0]}:{conn.getpeername()[1]}")
-            return HTTPResponse.build(status_code=401,
+            return HTTPResponse.build(server=self.server, status_code=401,
                                       reason="Bad Request",
                                       keep_alive=True)
-        
+
         # bug here?
         index = data.find(b"\r\n\r\n")
-        
+
         if index == -1:
             self.log.log(
                 LogLevel.INFO, f"Bad Request from {conn.getpeername()[0]}:{conn.getpeername()[1]}")
-            return HTTPResponse.build(status_code=401,
+            return HTTPResponse.build(server=self.server, status_code=401,
                                       reason="Bad Request",
                                       keep_alive=False)
         headers_data = data[:index]
@@ -90,13 +93,15 @@ class HTTPServer:
         elif http_request.get_method() == HTTPMethod.POST:
             response = self.handle_request_post(conn, http_request)
         elif http_request.get_method() == HTTPMethod.HEAD:
-            response = self.handle_request_get(conn, http_request, is_head=True)
+            response = self.handle_request_get(
+                conn, http_request, is_head=True)
         else:
-            return HTTPResponse.build(status_code=405,
+            return HTTPResponse.build(server=self.server, status_code=405,
                                       reason="Method Not Allowed")
         response.headers["Connection"] = "Keep-Alive" if keep_alive and response.status_code < 300 else "Close"
         if keep_alive:
-            response.headers["Keep-Alive"] = f"timeout={self.timeout}; max={self.parallel}"
+            response.headers["Keep-Alive"] = f"timeout={
+                self.timeout}; max={self.parallel}"
         return response
 
     def handle_connection(self, conn: socket.socket, addr: tuple):
@@ -112,13 +117,15 @@ class HTTPServer:
                 if not response.get_headers()["Connection"].lower() == "keep-alive":
                     break
             except Exception as e:
-                import traceback
-                traceback.print_exc()
-                self.log.log(LogLevel.ERROR, f"Error: {e}")
+                if self.debug:
+                    import traceback
+                    traceback.print_exc()
+                self.log.log(LogLevel.WARNING, f"Error: {e}")
                 break
         conn.close()
         self.log.log(
             LogLevel.INFO, f"Connection from {addr[0]}:{addr[1]} closed.")
+
     def _get_request_auth(self, headers: dict) -> (str, str, bool):
         if not "Authorization" in headers:
             if "Cookie" in headers:
@@ -143,7 +150,7 @@ class HTTPServer:
             password = user_pass.split(":")[1]
             return (user, password, False)
         return (None, None, False)
-    
+
     def _normalize_uri_path(self, path: str):
         if path.startswith("/"):
             path = path[1:]
@@ -157,7 +164,7 @@ class HTTPServer:
         return file_path, root_user, abs_file_path
 
     def _verify_auth(self, root_user: str, user: str, password: str, is_cookie: bool) -> (int, str, ud.UUID):
-        
+
         if user is None:
             return (401, "Authorization Required" if not is_cookie else "Cookie invalid or expired", None)
         if is_cookie:
@@ -176,31 +183,35 @@ class HTTPServer:
         else:
             cookie_uuid = utils.get_cookie_by_user(uuid)
             if cookie_uuid is None:
-                cookie_uuid = utils.generate_cookie(uuid, self.cookie_persist_time)
+                cookie_uuid = utils.generate_cookie(
+                    uuid, self.cookie_persist_time)
         return (200, "", cookie_uuid)
-    
+
     def handle_request_post(self, conn: socket.socket, http_request: HTTPRequest) -> HTTPResponse:
         uri = http_request.get_uri()
         if "path" not in http_request.parameters:
-            return HTTPResponse.build(status_code=401, reason="Bad Request")
+            return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
         path = http_request.parameters["path"]
         file_path, root_user, abs_file_path = self._normalize_uri_path(path)
-        user, password, is_cookie = self._get_request_auth(http_request.get_headers())
-        auth_code, msg, uuid = self._verify_auth(root_user, user, password, is_cookie)
+        user, password, is_cookie = self._get_request_auth(
+            http_request.get_headers())
+        auth_code, msg, uuid = self._verify_auth(
+            root_user, user, password, is_cookie)
         if auth_code != 200:
-                return HTTPResponse.build(status_code=auth_code,
-                                          reason="Unauthorized" if auth_code != 403 else msg,
-                                          headers={"WWW-Authenticate": f"Basic realm=\"{ msg }\""} if auth_code != 403 else None)
+            return HTTPResponse.build(server=self.server, status_code=auth_code,
+                                      reason="Unauthorized" if auth_code != 403 else msg,
+                                      headers={"WWW-Authenticate": f"Basic realm=\"{msg}\""} if auth_code != 403 else None)
 
         if not os.path.exists(abs_file_path):
-            return HTTPResponse.build(status_code=404, reason="Not Found")
+            return HTTPResponse.build(server=self.server, status_code=404, reason="Not Found")
 
         if uri.lower() == "/upload":
             headers = http_request.get_headers()
             if "Content-Type" in headers:
                 if "boundary=" not in headers["Content-Type"]:
-                    return HTTPResponse.build(status_code=401, reason="Bad Request")
-                content_type_headers = dict(_header.split("=") for _header in headers["Content-Type"].split("; ")[1:])
+                    return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
+                content_type_headers = dict(_header.split(
+                    "=") for _header in headers["Content-Type"].split("; ")[1:])
                 boundary = content_type_headers["boundary"]
                 boundary = boundary.encode()
                 body = http_request.get_body()
@@ -208,7 +219,7 @@ class HTTPServer:
                     data = conn.recv(UPLOAD_SPEED)
                     body += data if data else b""
                     if boundary not in body:
-                        return HTTPResponse.build(status_code=401, reason="Bad Request")
+                        return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
                 index = body.find(boundary)
                 body = body[index:]
                 while True:
@@ -223,7 +234,7 @@ class HTTPServer:
                                 while True:
                                     line = next_line
                                     if not line:
-                                        return HTTPResponse.build(status_code=401, reason="Bad Request")
+                                        return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
                                     if line.startswith(b"--" + boundary + b"--"):
                                         if current_file:
                                             current_file.close()
@@ -237,7 +248,8 @@ class HTTPServer:
                                         while True:
                                             line = tmp.readline()
                                             if line.startswith(b"Content-Disposition"):
-                                                content_disposition = line.decode("utf-8").strip()
+                                                content_disposition = line.decode(
+                                                    "utf-8").strip()
                                                 if "filename" in content_disposition:
                                                     _headers = dict([header.split("=")
                                                                     for header in content_disposition.split("; ")[1:]])
@@ -251,29 +263,31 @@ class HTTPServer:
                                             abs_file_path, filename)
                                         while os.path.exists(upload_file_path):
                                             index = filename.rfind(".")
-                                            filename = filename[:index] + " (1)" + filename[index:]
+                                            filename = filename[:index] + \
+                                                " (1)" + filename[index:]
                                             upload_file_path = os.path.join(
                                                 abs_file_path, filename)
-                                        current_file = open(upload_file_path, "wb")
+                                        current_file = open(
+                                            upload_file_path, "wb")
                                         next_line = tmp.readline()
                                         continue
                                     next_line = tmp.readline()
                                     if next_line and (next_line.startswith(boundary) or next_line.startswith(b"--" + boundary)):
                                         line = line[:-len(b'\r\n')]
                                     current_file.write(line)
-                                return HTTPResponse.build(status_code=200, reason="OK")
+                                return HTTPResponse.build(server=self.server, status_code=200, reason="OK")
                             body = conn.recv(UPLOAD_SPEED)
                             if not body:
-                                return HTTPResponse.build(status_code=401, reason="Bad Request")
-                return HTTPResponse.build(status_code=401, reason="Bad Request")
-            return HTTPResponse.build(status_code=401, reason="Bad Request")
+                                return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
+                return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
+            return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
         elif uri.lower() == "/delete":
             if os.path.isdir(abs_file_path):
-                return HTTPResponse.build(status_code=401, reason="You can not delete a directory")
+                return HTTPResponse.build(server=self.server, status_code=401, reason="You can not delete a directory")
             os.remove(abs_file_path)
-            return HTTPResponse.build(status_code=200, reason="OK")
+            return HTTPResponse.build(server=self.server, status_code=200, reason="OK")
         else:
-            return HTTPResponse.build(status_code=401, reason="Bad Request")
+            return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
 
     def handle_request_get(self, conn: socket.socket, http_request: HTTPRequest, is_head: bool = False) -> HTTPResponse:
 
@@ -286,28 +300,39 @@ class HTTPServer:
                                       len(body))
         uri = http_request.get_uri()
         if uri == "/":
-            current_dir = utils.get_root_dir()
-            html = utils.file_explore_html(current_dir, "test", current_dir)
-            response = HTTPResponse.build(body=(HTTPBodyType.TEXT, html) if not is_head else (HTTPBodyType.EMPTY, None),
-                                          status_code=200,
+            user, password, is_cookie = self._get_request_auth(
+                http_request.get_headers())
+            if not "Authorization" in http_request.get_headers() and user is None:
+                return HTTPResponse.build(server=self.server, status_code=200,
                                           reason="OK",
-                                          content_type="text/html; charset=utf-8" if not is_head else None)
-            return response
+                                          content_type="text/html",
+                                          body=(HTTPBodyType.TEXT, utils.login_html()))
+            auth_code, msg, cookie_uuid = self._verify_auth(
+                user, user, password, is_cookie)
+            if auth_code != 200:
+                return HTTPResponse.build(server=self.server, status_code=auth_code,
+                                          reason="login failed")
+            return HTTPResponse.build(server=self.server, status_code=302,
+                                      reason="Found",
+                                      headers={"Location": f"/{user}"})
+
         else:
             file_path, root_user, abs_file_path = self._normalize_uri_path(uri)
             if file_path.startswith("/favicon.ico"):
-                return HTTPResponse.build(status_code=404,
+                return HTTPResponse.build(server=self.server, status_code=404,
                                           reason="Not Found")
-            user, password, is_cookie = self._get_request_auth(http_request.get_headers())
-            auth_code, msg, cookie_uuid = self._verify_auth(root_user, user, password, is_cookie)
-            
+            user, password, is_cookie = self._get_request_auth(
+                http_request.get_headers())
+            auth_code, msg, cookie_uuid = self._verify_auth(
+                root_user, user, password, is_cookie)
+
             if auth_code != 200:
-                return HTTPResponse.build(status_code=auth_code,
+                return HTTPResponse.build(server=self.server, status_code=auth_code,
                                           reason="Unauthorized" if auth_code != 403 else msg,
-                                          headers={"WWW-Authenticate": f"Basic realm=\"{ msg }\""} if auth_code != 403 else None)
+                                          headers={"WWW-Authenticate": f"Basic realm=\"{msg}\""} if auth_code != 403 else None)
 
             if not os.path.exists(abs_file_path):
-                return HTTPResponse.build(status_code=404, reason="Not Found")
+                return HTTPResponse.build(server=self.server, status_code=404, reason="Not Found")
 
             if os.path.isdir(abs_file_path):
                 sustech_http = False
@@ -316,10 +341,11 @@ class HTTPServer:
                         sustech_http = True
                 html = utils.file_explore_html(
                     file_path, root_user, abs_file_path, sustech_http=sustech_http)
-                return HTTPResponse.build(body=(HTTPBodyType.TEXT, html) if not is_head else (HTTPBodyType.EMPTY, None),
+                return HTTPResponse.build(server=self.server, body=(HTTPBodyType.TEXT, html) if not is_head else (HTTPBodyType.EMPTY, None),
                                           status_code=200,
                                           reason="OK",
-                                          content_type=("text/html" if not sustech_http else "text/plain") + "; charset=utf-8" if not is_head else None,
+                                          content_type=(
+                                              "text/html" if not sustech_http else "text/plain") + "; charset=utf-8" if not is_head else None,
                                           set_cookie="session-id=" + str(cookie_uuid))
             else:
                 file_type = mimetypes.guess_type(abs_file_path)[0]
@@ -333,17 +359,17 @@ class HTTPServer:
                     else:
                         ranges = None
                     if ranges is None:
-                        return HTTPResponse.build(status_code=416,
+                        return HTTPResponse.build(server=self.server, status_code=416,
                                                   reason="Range Not Satisfiable")
-                    return HTTPResponse.build(body=(HTTPBodyType.FILE, abs_file_path) if not is_head else (HTTPBodyType.EMPTY, None),
+                    return HTTPResponse.build(server=self.server, body=(HTTPBodyType.FILE, abs_file_path) if not is_head else (HTTPBodyType.EMPTY, None),
                                               status_code=206,
                                               reason="Partial Content",
                                               content_type=file_type if not is_head else None,
                                               ranges=ranges,
                                               set_cookie="session-id=" + str(cookie_uuid))
-                return HTTPResponse.build(body=(HTTPBodyType.FILE, abs_file_path) if not is_head else (HTTPBodyType.EMPTY, None),
+                return HTTPResponse.build(server=self.server, body=(HTTPBodyType.FILE, abs_file_path) if not is_head else (HTTPBodyType.EMPTY, None),
                                           status_code=200,
                                           reason="OK",
                                           content_type=file_type if not is_head else None,
                                           set_cookie="session-id=" + str(cookie_uuid))
-        return HTTPResponse.build(status_code=404, reason="Not Found")
+        return HTTPResponse.build(server=self.server, status_code=404, reason="Not Found")
