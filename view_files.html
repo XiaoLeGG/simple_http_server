@@ -4,13 +4,112 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ user_name }}'s Files</title>
+    <style>
+        #progress-container {
+            margin-top: 20px;
+            border: black 2px solid;
+            border-radius: 5px;
+            width: 500px;
+        }
+        #progress-bar {
+            width: 0;
+            height: 20px;
+            background-color: #4CAF50;
+        }
+    </style>
 </head>
 <body>
     <h1>{{ current_path }}</h1>
     <ul>
         {% for file in files %}
-            <li><a href="{{ file[0] }}" download="{{ file[1] }}">{{ file[1] }}</a></li>
+            {% if file[2] %}
+                <li><a href="{{ file[0] }}">{{ file[1] }}</a></li>
+            {% else %}
+                <div>
+                    <li><a href="{{ file[0] }}" download="{{ file[1] }}">{{ file[1] }}</a></li>
+                    <button onclick="deleteFile('{{ file[0] }}')">Delete</button>
+                </div>
+            {% endif %}
         {% endfor %}
     </ul>
+    <form id="uploadForm">
+        <input type="file" name="file" id="fileInput" multiple>
+        <input type="button" value="Upload" onclick="uploadFile()">
+    </form>
+
+    <div id="progress-container">
+        <div id="progress-bar"></div>
+    </div>
+
+    <script>
+        function deleteFile(path) {
+            if (!confirm("Are you sure to delete this file?")) {
+                return;
+            }
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/delete?path=" + path, true);
+            xhr.send();
+            xhr.onload = function () {
+                if (xhr.status!= 200) {
+                    alert("Failed to delete file: " + xhr.responseText);
+                    location.reload();
+                    return;
+                }
+                alert("File delete successfully!");
+                location.reload();
+            }
+        }
+        function uploadFile() {
+            var fileInput = document.getElementById("fileInput");
+            var file = fileInput.files[0];
+
+            if (!file) {
+                alert("Please select a file first!");
+                return;
+            }
+
+            var formData = new FormData();
+            for (var i = 0; i < fileInput.files.length; i++) {
+                formData.append("file", fileInput.files[i]);
+            }
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/upload?path={{ current_path }}", true);
+
+            // 上传进度回调
+            xhr.upload.onprogress = function (event) {
+                if (event.lengthComputable) {
+                    var percentComplete = max(0.99, (event.loaded / event.total)) * 100;
+                    document.getElementById("progress-bar").style.width = percentComplete + "%";
+                }
+            };
+
+            // 上传完成回调
+            xhr.onload = function () {
+                if (xhr.status === 200) {
+                    alert("Upload successfully!");
+                    resetProgress();
+                    location.reload();
+                } else {
+                    alert("Fail to upload: " + xhr.statusText);
+                    resetProgress();
+                    location.reload();
+                }
+            };
+
+            // 发送请求
+            xhr.send(formData);
+
+            // 显示进度条
+            document.getElementById("progress-container").style.display = "block";
+        }
+
+        // 重置进度条
+        function resetProgress() {
+            document.getElementById("progress-container").style.display = "none";
+            document.getElementById("progress-bar").style.width = "0";
+        }
+    </script>
 </body>
 </html>

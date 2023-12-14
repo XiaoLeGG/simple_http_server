@@ -4,7 +4,7 @@ import socket
 import enum
 import utils
 
-CHUNK_FILE_SIZE = 1024 * 1024 * 10
+DOWNLOAD_SPEED = 1024 * 1024 * 100
 
 class HTTPBodyType(enum.Enum):
     EMPTY = "empty"
@@ -104,6 +104,7 @@ class HTTPResponse:
             self.headers["Content-Length"] = len(self.body[1])
             conn.sendall(self._build_headers().encode())
             conn.sendall(self.body[1] + b"\r\n\r\n")
+
             return
 
         if (self.body[0] == HTTPBodyType.FILE):
@@ -135,21 +136,21 @@ class HTTPResponse:
                 else:
                     
                     # Transfer-Encoding
-                    if file_size > CHUNK_FILE_SIZE:
+                    if file_size > DOWNLOAD_SPEED * 10:
                         # response_builder.append(f"Content-Length: 0\r\n")
                         self.headers["Transfer-Encoding"] = "chunked"
                         headers_str = self._build_headers()
                         conn.sendall(headers_str.encode())
-                        print(headers_str)
+                        # print(headers_str)
                         
                         while True:
-                            data = file.read(CHUNK_FILE_SIZE)
+                            data = file.read(DOWNLOAD_SPEED)
                             if not data:
                                 break
                             conn.sendall(f"{len(data):X}\r\n".encode())
                             conn.sendall(data)
                             conn.sendall(b"\r\n")
-                            if len(data) < CHUNK_FILE_SIZE:
+                            if len(data) < DOWNLOAD_SPEED:
                                 break
                         conn.sendall(b"0\r\n\r\n")
                         return

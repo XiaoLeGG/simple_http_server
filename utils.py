@@ -52,6 +52,7 @@ def generate_folder(user_name : str):
     else:
         print(os.path.abspath(folder_name))
     return folder_name
+
 def create_user(user_name : str, password : str) -> ud.UUID:
     exist_uuid = get_user_by_name(user_name)
     if exist_uuid is not None:
@@ -173,12 +174,18 @@ def file_explore_html(dir : str, user_name : str, abs_dir : str, uuid : ud.UUID=
         template_content = template_file.read()
 
     files = []
+
+    if os.path.dirname(dir) != "/":
+        files = [(os.path.dirname(dir), "../", True)]
+
     for file in abs_files:
         file_name = os.path.basename(file)
         if os.path.isdir(os.path.join(abs_dir, file)):
-            files.append((dir + "/" + file_name + "/", file_name + "/"))
+            files.append((dir + "/" + file_name + "/", file_name + "/", True))
         else:
-            files.append((dir + "/" + file_name, file_name))
+            files.append((dir + "/" + file_name, file_name, False))
+    
+    files.sort(key=lambda x: (not x[2], x[1]))
 
     template = Template(template_content)
     rendered_html = template.render(files=files, user_name=user_name, current_path=dir)
