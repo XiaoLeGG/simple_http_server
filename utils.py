@@ -208,6 +208,8 @@ def filter_path(path : str) -> str:
     path = path.replace("//", "/")
 
 def normalize_and_validate_path(base_path : str, request_uri : str) -> str:
+    if request_uri.startswith("/"):
+        request_uri = request_uri[1:]
     normalized_path = os.path.normpath(os.path.join(base_path, request_uri))
     if os.path.commonprefix([normalized_path, base_path]) != base_path:
         return None

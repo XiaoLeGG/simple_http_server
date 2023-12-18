@@ -172,7 +172,9 @@ class HTTPServer:
 
         file_path = utils.normalize_and_validate_path("/", path)
         root_user = file_path.split("/")[1]
-        abs_file_path = utils.get_data_dir() + "/" + file_path
+        if file_path.startswith("/"):
+            file_path = file_path[1:]
+        abs_file_path = os.path.join(utils.get_data_dir(), file_path)
 
         return file_path, root_user, abs_file_path
 
@@ -232,9 +234,30 @@ class HTTPServer:
 
         if not os.path.exists(abs_file_path):
             return HTTPResponse.build(server=self.server, status_code=404, reason="Not Found")
-
+        
         if uri.lower() == "/upload":
             headers = http_request.get_headers()
+            if "Rename" in headers:
+                rename = headers["Rename"]
+                os.rename(abs_file_path, rename)
+                return HTTPResponse.build(server=self.server, status_code=200, reason="OK")
+            if os.path.isfile(abs_file_path):
+                return HTTPResponse.build(server=self.server, status_code=401, reason="You can not upload any thing to a file")
+            if "Directory" in headers:
+                dir_name = headers["Directory"]
+                if dir_name.startswith("/"):
+                    dir_name = dir_name[1:]
+                if dir_name.endswith("/"):
+                    dir_name = dir_name[:-1]
+                dir_name = utils.normalize_and_validate_path("/", dir_name)
+                if dir_name is None:
+                    return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
+                if dir_name.startswith("/"):
+                    dir_name = dir_name[1:]
+                abs_dir = os.path.join(abs_file_path, dir_name)
+                if not os.path.exists(abs_dir):
+                    os.makedirs(abs_dir)
+                return HTTPResponse.build(server=self.server, status_code=200, reason="OK")
             if "Content-Type" in headers:
                 if "boundary=" not in headers["Content-Type"]:
                     return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
