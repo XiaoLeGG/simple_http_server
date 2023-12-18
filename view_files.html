@@ -5,111 +5,233 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ user_name }}'s Files</title>
     <style>
-        #progress-container {
-            margin-top: 20px;
-            border: black 2px solid;
-            border-radius: 5px;
-            width: 500px;
+        @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;700&display=swap');
+
+        body {
+            font-family: 'Open Sans', sans-serif;
+            background-color: #f4f4f4;
+            letter-spacing: 0.5px;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
         }
+
+        h1 {
+            color: #333333;
+            font-size: 3rem;
+            margin: 1.5rem 0;
+        }
+
+
+        a {
+            text-decoration: none;
+            color: #007bff;
+            transition: color 0.3s;
+        }
+
+        a:hover {
+            color: #0056b3;
+        }
+
+        #progress-container {
+            width: 80%;
+            max-width: 800px;
+            height: 30px;
+            overflow: hidden;
+            border-radius: 15px;
+            background-color: #dddddd;
+            margin: 1rem 0;
+        }
+
+        #progress {
+            width: 80%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #progress-text {
+            font-size: 1.2rem;
+            /* margin: 1rem 0; */
+        }
+
         #progress-bar {
             width: 0;
-            height: 20px;
+            height: 100%;
+            border-radius: 12px;
+            transition: width 0.4s ease;
+            background-image: linear-gradient(to right, #8bc34a 0%, #4caf50 100%);
+        }
+
+        form {
+            margin: 2rem 0;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            text-align: left;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        li {
+            display: flex;
+            align-items: center;
+            justify-content: start;
+            margin: 1rem 0;
+            font-size: 1.5rem;
+            padding-left: 0;
+        }
+
+        li a {
+            flex-grow: 1;
+            margin-right: 5px;
+        }
+
+        input[type="file"] {
+            border: 2px solid #dddddd;
+            padding: 1rem;
+            margin: 0 1rem 1rem 0;
+            font-size: 1.2rem;
+        }
+
+        input[type="button"] {
             background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s, box-shadow 0.3s;
+            font-size: 1.2rem;
+        }
+
+        input[type="button"]:hover {
+            background-color: #3F9342;
+            box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        button {
+            background-color: #ff4d4d;
+            color: white;
+            margin-left: 5px;
+            padding: 0.5rem 1rem;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s, box-shadow 0.3s;
+            font-size: 1.2rem;
+        }
+
+        button:hover {
+            background-color: #cc0000;
+            box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2);
         }
     </style>
 </head>
 <body>
-    <h1>{{ current_path }}</h1>
-    <ul>
-        {% for file in files %}
-            {% if file[2] %}
-                <li><a href="{{ file[0] }}">{{ file[1] }}</a></li>
-            {% else %}
-                <div>
-                    <li><a href="{{ file[0] }}" download="{{ file[1] }}">{{ file[1] }}</a></li>
-                    <button onclick="deleteFile('{{ file[0] }}')">Delete</button>
-                </div>
-            {% endif %}
-        {% endfor %}
-    </ul>
-    <form id="uploadForm">
-        <input type="file" name="file" id="fileInput" multiple>
-        <input type="button" value="Upload" onclick="uploadFile()">
-    </form>
-
+<h1>{{ current_path }}</h1>
+<ul>
+    {% for file in files %}
+    <li>
+        <a href="{{ file[0] }}" {{ 'download' if not file[2] else '' }}>{{ file[1] }}</a>
+        {% if not file[2] %}
+        <button onclick="deleteFile('{{ file[0] }}')">Delete</button>
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+<form id="uploadForm">
+    <input type="file" name="file" id="fileInput" multiple>
+    <input type="button" value="Upload" onclick="uploadFile()">
+</form>
+<div id="progress">
     <div id="progress-container">
         <div id="progress-bar"></div>
     </div>
+    <span id="progress-text">0.00%</span>
+</div>
 
-    <script>
-        function deleteFile(path) {
-            if (!confirm("Are you sure to delete this file?")) {
+
+<script>
+    resetProgress();
+    function deleteFile(path) {
+        if (!confirm("Are you sure to delete this file?")) {
+            return;
+        }
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "/delete?path=" + path, true);
+        xhr.send();
+        xhr.onload = function () {
+            if (xhr.status != 200) {
+                alert("Failed to delete file: " + xhr.responseText);
+                location.reload();
                 return;
             }
+            alert("File delete successfully!");
+            location.reload();
+        }
+    }
 
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", "/delete?path=" + path, true);
-            xhr.send();
-            xhr.onload = function () {
-                if (xhr.status!= 200) {
-                    alert("Failed to delete file: " + xhr.responseText);
-                    location.reload();
-                    return;
-                }
-                alert("File delete successfully!");
+    function uploadFile() {
+        var fileInput = document.getElementById("fileInput");
+        var file = fileInput.files[0];
+
+        if (!file) {
+            alert("Please select a file first!");
+            return;
+        }
+
+        var formData = new FormData();
+        for (var i = 0; i < fileInput.files.length; i++) {
+            formData.append("file", fileInput.files[i]);
+        }
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "/upload?path={{ current_path }}", true);
+        time = new Date().getTime();
+        xhr.upload.onprogress = function (event) {
+            if (event.lengthComputable) {
+                var percentComplete = Math.min(0.99, (event.loaded / event.total)) * 100;
+                document.getElementById("progress-text").textContent = percentComplete.toFixed(2) + "%" + " / " + (event.loaded / ((new Date().getTime() - time) / 1000) / 1024 / 1024).toFixed(2)+ "Mb/s";
+                if (event.loaded / event.total > 0.9999)
+                    document.getElementById("progress-text").textContent = "Upload completed. Processing file...";
+                document.getElementById("progress-bar").style.width = percentComplete + "%";
+            }
+        };
+
+        xhr.onload = function () {
+            if (xhr.status === 200) {
+                
+                alert("Upload successfully!");
+                resetProgress();
+                location.reload();
+            } else {
+                alert("Fail to upload: " + xhr.statusText);
+                resetProgress();
                 location.reload();
             }
-        }
-        function uploadFile() {
-            var fileInput = document.getElementById("fileInput");
-            var file = fileInput.files[0];
+        };
 
-            if (!file) {
-                alert("Please select a file first!");
-                return;
-            }
+        xhr.send(formData);
 
-            var formData = new FormData();
-            for (var i = 0; i < fileInput.files.length; i++) {
-                formData.append("file", fileInput.files[i]);
-            }
+        document.getElementById("progress").style.display = "flex";
+        document.getElementById("progress-text").textContent = "0.00%";
+        document.getElementById("progress-bar").style.width = "0%";
+    }
 
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", "/upload?path={{ current_path }}", true);
-
-            // 上传进度回调
-            xhr.upload.onprogress = function (event) {
-                if (event.lengthComputable) {
-                    var percentComplete = max(0.99, (event.loaded / event.total)) * 100;
-                    document.getElementById("progress-bar").style.width = percentComplete + "%";
-                }
-            };
-
-            // 上传完成回调
-            xhr.onload = function () {
-                if (xhr.status === 200) {
-                    alert("Upload successfully!");
-                    resetProgress();
-                    location.reload();
-                } else {
-                    alert("Fail to upload: " + xhr.statusText);
-                    resetProgress();
-                    location.reload();
-                }
-            };
-
-            // 发送请求
-            xhr.send(formData);
-
-            // 显示进度条
-            document.getElementById("progress-container").style.display = "block";
-        }
-
-        // 重置进度条
-        function resetProgress() {
-            document.getElementById("progress-container").style.display = "none";
-            document.getElementById("progress-bar").style.width = "0";
-        }
-    </script>
+    // 重置进度条
+    function resetProgress() {
+        document.getElementById("progress").style.display = "none";
+        document.getElementById("progress-text").textContent = "0.00%"
+        document.getElementById("progress-bar").style.width = "0%";
+    }
+</script>
 </body>
 </html>

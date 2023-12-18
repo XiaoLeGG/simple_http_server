@@ -3,38 +3,65 @@
 <head>
     <title>Login Panel</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Open+Sans&display=swap');
+
+        body {
+            font-family: 'Open Sans', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+            letter-spacing: 1px;
+        }
+
         .container {
-            width: 300px;
-            margin: 0 auto;
-            padding: 20px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
+            width: 100%;
+            max-width: 500px;
+            padding: 40px;
+            margin: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            background-color: rgba(240, 255, 255, 0.9);
         }
 
         .form-group {
-            margin-bottom: 10px;
+            margin-bottom: 20px;
+            max-width: 450px;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         .form-group label {
             display: block;
-            font-weight: bold;
+            font-weight: bolder;
         }
 
         .form-group input {
             width: 100%;
-            padding: 5px;
-            border: 1px solid #ccc;
+            padding: 12px;
+            border: 2px solid #ddd;
             border-radius: 3px;
+            margin-top: 8px;
+            font-weight: normal;
+            font-size: 16px;
         }
 
         .form-group button {
             width: 100%;
-            padding: 10px;
-            background-color: #4CAF50;
+            padding: 15px;
+            background-color: #007bff;
             color: white;
             border: none;
             border-radius: 3px;
             cursor: pointer;
+            transition: background-color 0.3s, transform 0.3s;
+        }
+
+        .form-group button:hover {
+            background-color: #0056b3;
+            transform: scale(1.05);
         }
     </style>
     <script>
@@ -58,21 +85,21 @@
     </script>
 </head>
 <body>
-    <div class="container">
-        <h2>Login</h2>
-        <form>
-            <div class="form-group">
-                <label for="username">Username:</label>
-                <input type="text" id="username" name="username" placeholder="Enter your username">
-            </div>
-            <div class="form-group">
-                <label for="password">Password:</label>
-                <input type="password" id="password" name="password" placeholder="Enter your password">
-            </div>
-            <div class="form-group">
-                <button type="button" onclick="login()">Login</button>
-            </div>
-        </form>
-    </div>
+<div class="container">
+    <h2>Login</h2>
+    <form>
+        <div class="form-group">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" placeholder="Enter your username">
+        </div>
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" placeholder="Enter your password">
+        </div>
+        <div class="form-group">
+            <button type="button" onclick="login()">Login</button>
+        </div>
+    </form>
+</div>
 </body>
 </html>
