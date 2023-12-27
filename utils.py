@@ -187,15 +187,15 @@ def file_explore_html(dir : str, user_name : str, abs_dir : str, uuid : ud.UUID=
         file_explore_template = Template(template_content)
     files = []
 
-    if os.path.dirname(dir) != "/":
-        files = [(os.path.dirname(dir), "../", True)]
+    if dir.lower() != user_name:
+        files = [("../", "../", True)]
 
     for file in abs_files:
         file_name = os.path.basename(file)
         if os.path.isdir(os.path.join(abs_dir, file)):
-            files.append((dir + "/" + file_name + "/", file_name + "/", True))
+            files.append((file_name + "/", file_name + "/", True))
         else:
-            files.append((dir + "/" + file_name, file_name, False))
+            files.append((file_name, file_name, False))
     
     files.sort(key=lambda x: (not x[2], x[1]))
 

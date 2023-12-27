@@ -194,7 +194,7 @@ class HTTPServer:
             return (401, "Wrong password", None)
         if is_cookie:
             cookie_uuid = ud.UUID(password)
-            # utils.resign_cookie(cookie_uuid, self.cookie_persist_time)
+            utils.resign_cookie(cookie_uuid, self.cookie_persist_time)
         else:
             cookie_uuid = utils.get_cookie_by_user(uuid)
             if cookie_uuid is None:
@@ -220,7 +220,7 @@ class HTTPServer:
     def handle_request_post(self, conn: HTTPConnection, http_request: HTTPRequest) -> HTTPResponse:
         uri = http_request.get_uri()
         if "path" not in http_request.parameters:
-            return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
+            return HTTPResponse.build(server=self.server, status_code=405, reason="Invalid Method")
         path = http_request.parameters["path"]
         file_path, root_user, abs_file_path = self._normalize_uri_path(path)
         user, password, is_cookie = self._get_request_auth(
@@ -386,7 +386,7 @@ class HTTPServer:
 
             if not os.path.exists(abs_file_path):
                 return HTTPResponse.build(server=self.server, status_code=404, reason="Not Found")
-
+            
             if os.path.isdir(abs_file_path):
                 sustech_http = False
                 if "SUSTech-HTTP" in http_request.parameters:

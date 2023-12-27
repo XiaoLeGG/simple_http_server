@@ -17,6 +17,7 @@
             align-items: center;
             justify-content: center;
             min-height: 100vh;
+            line-height: 1.6;
         }
 
         h1 {
@@ -44,6 +45,18 @@
             border-radius: 15px;
             background-color: #dddddd;
             margin: 1rem 0;
+        }
+
+        #file-explorer-panel {
+            border: 2px solid white;
+            background-color: white; /* Set a light background color */
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 10px;
+            margin: 10px;
+            width: 60%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         #progress {
@@ -86,6 +99,7 @@
             margin: 1rem 0;
             font-size: 1.5rem;
             padding-left: 0;
+            font-size: 1.2rem;
         }
 
         li a {
@@ -132,30 +146,39 @@
             background-color: #cc0000;
             box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2);
         }
+
+        #fileInput {
+            border: transparent;
+            background-color: transparent;
+            display: inline-block;
+        }
+
     </style>
 </head>
-<body>
-<h1>{{ current_path }}</h1>
-<ul>
-    {% for file in files %}
-    <li>
-        <a href="{{ file[0] | e}}" {{ 'download' if not file[2] else '' }}>{{ file[1] | e}}</a>
-        {% if not file[2] %}
-        <button onclick="deleteFile('{{ file[0] | e}}')">Delete</button>
-        {% endif %}
-    </li>
-    {% endfor %}
-</ul>
+<div id="file-explorer-panel">
+    <body>
+    <h1>{{ current_path }}</h1>
+    <ul>
+        {% for file in files %}
+        <li>
+            <a href="{{ file[0] | e}}" {{ 'download' if not file[2] else '' }}>{{ file[1] | e}}</a>
+            {% if not file[2] %}
+            <button onclick="deleteFile('{{ file[0] | e}}')">Delete</button>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
 
-<form id="uploadForm">
-    <input type="file" name="file" id="fileInput" multiple>
-    <input type="button" value="Upload" onclick="uploadFile()">
-</form>
-<div id="progress">
-    <div id="progress-container">
-        <div id="progress-bar"></div>
+    <form id="uploadForm">
+        <input type="file" name="file" id="fileInput" multiple>
+        <input type="button" value="Upload" onclick="uploadFile()">
+    </form>
+    <div id="progress">
+        <div id="progress-container">
+            <div id="progress-bar"></div>
+        </div>
+        <span id="progress-text">0.00%</span>
     </div>
-    <span id="progress-text">0.00%</span>
 </div>
 
 
