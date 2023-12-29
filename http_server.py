@@ -222,7 +222,7 @@ class HTTPServer:
     def handle_request_post(self, conn: HTTPConnection, http_request: HTTPRequest) -> HTTPResponse:
         uri = http_request.get_uri()
         if "path" not in http_request.parameters:
-            return HTTPResponse.build(server=self.server, status_code=405, reason="Invalid Method")
+            return HTTPResponse.build(server=self.server, status_code=401, reason="Invalid Method")
         path = http_request.parameters["path"]
         file_path, root_user, abs_file_path = self._normalize_uri_path(path)
         user, password, is_cookie = self._get_request_auth(
@@ -241,8 +241,15 @@ class HTTPServer:
             headers = http_request.get_headers()
             if "Rename" in headers:
                 rename = headers["Rename"]
-                rename = os.path.basename(rename)
+                while rename.endswith("/") or rename.endswith("\\"):
+                    rename = rename[:-1]
+                if "/" in rename:
+                    rename = rename.split("/")[-1]
+                if "\\" in rename:
+                    rename = rename.split("\\")[-1]
                 new_name = os.path.join(os.path.dirname(abs_file_path), rename)
+                if new_name is None or new_name == "":
+                    return HTTPResponse.build(server=self.server, status_code=401, reason="Invalid File Name")
                 if os.path.exists(new_name):
                     return HTTPResponse.build(server=self.server, status_code=401, reason="File already exists")
                 os.rename(abs_file_path, new_name)
@@ -251,16 +258,14 @@ class HTTPServer:
                 return HTTPResponse.build(server=self.server, status_code=401, reason="You can not upload any thing to a file")
             if "Directory" in headers:
                 dir_name = headers["Directory"]
-                if dir_name.startswith("/"):
-                    dir_name = dir_name[1:]
-                if dir_name.endswith("/"):
+                while dir_name.endswith("/") or dir_name.endswith("\\"):
                     dir_name = dir_name[:-1]
-                dir_name = utils.normalize_and_validate_path(
-                    os.path.sep, dir_name)
-                if dir_name is None:
-                    return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
-                if dir_name.startswith("/"):
-                    dir_name = dir_name[1:]
+                if "/" in dir_name:
+                    dir_name = dir_name.split("/")[-1]
+                if "\\" in dir_name:
+                    dir_name = dir_name.split("\\")[-1]
+                if dir_name is None or dir_name == "":
+                    return HTTPResponse.build(server=self.server, status_code=401, reason="Invalid Directory Name")
                 abs_dir = os.path.join(abs_file_path, dir_name)
                 if not os.path.exists(abs_dir):
                     os.makedirs(abs_dir)
