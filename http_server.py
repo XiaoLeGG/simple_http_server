@@ -95,7 +95,8 @@ class HTTPServer:
             response = self.handle_request_post(conn, http_request)
         elif http_request.get_method() == HTTPMethod.HEAD:
             response = self.handle_request_get(
-                conn, http_request, is_head=True)
+                conn, http_request)
+            response.is_head = True
         elif http_request.get_method() == HTTPMethod.ENCRYPT:
             response, aes_encryptor = self.hanlde_request_encrypt(
                 conn, http_request
@@ -119,7 +120,7 @@ class HTTPServer:
             try:
                 response, aes_encryptor = self.handle_request(conn)
                 self.log.log(
-                    LogLevel.INFO, f"Response to {conn.getpeername()[0]}:{conn.getpeername()[1]}: {response.get_status_code()} {response.get_reason()}")
+                    LogLevel.INFO, f"Response to {addr[0]}:{addr[1]}: {response.get_status_code()} {response.get_reason()}")
                 response.send(conn)
                 if not response.get_headers()["Connection"].lower() == "keep-alive":
                     break
@@ -346,7 +347,7 @@ class HTTPServer:
         else:
             return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
 
-    def handle_request_get(self, conn: HTTPConnection, http_request: HTTPRequest, is_head: bool = False) -> HTTPResponse:
+    def handle_request_get(self, conn: HTTPConnection, http_request: HTTPRequest) -> HTTPResponse:
 
         if "Content-Length" in http_request.get_headers():
             content_length = int(http_request.get_headers()["Content-Length"])
@@ -400,11 +401,11 @@ class HTTPServer:
                         sustech_http = True
                 html = utils.file_explore_html(
                     file_path, root_user, abs_file_path, sustech_http=sustech_http)
-                return HTTPResponse.build(server=self.server, body=(HTTPBodyType.TEXT, html) if not is_head else (HTTPBodyType.EMPTY, None),
+                return HTTPResponse.build(server=self.server, body=(HTTPBodyType.TEXT, html),
                                           status_code=200,
                                           reason="OK",
                                           content_type=(
-                                              "text/html" if not sustech_http else "text/plain") + "; charset=utf-8" if not is_head else None,
+                                              "text/html" if not sustech_http else "text/plain") + "; charset=utf-8",
                                           set_cookie="session-id=" + str(cookie_uuid))
             else:
                 file_type = mimetypes.guess_type(abs_file_path)[0]
@@ -420,15 +421,15 @@ class HTTPServer:
                     if ranges is None:
                         return HTTPResponse.build(server=self.server, status_code=416,
                                                   reason="Range Not Satisfiable")
-                    return HTTPResponse.build(server=self.server, body=(HTTPBodyType.FILE, abs_file_path) if not is_head else (HTTPBodyType.EMPTY, None),
+                    return HTTPResponse.build(server=self.server, body=(HTTPBodyType.FILE, abs_file_path),
                                               status_code=206,
                                               reason="Partial Content",
-                                              content_type=file_type if not is_head else None,
+                                              content_type=file_type,
                                               ranges=ranges,
                                               set_cookie="session-id=" + str(cookie_uuid))
-                return HTTPResponse.build(server=self.server, body=(HTTPBodyType.FILE, abs_file_path) if not is_head else (HTTPBodyType.EMPTY, None),
+                return HTTPResponse.build(server=self.server, body=(HTTPBodyType.FILE, abs_file_path),
                                           status_code=200,
                                           reason="OK",
-                                          content_type=file_type if not is_head else None,
+                                          content_type=file_type,
                                           set_cookie="session-id=" + str(cookie_uuid))
         return HTTPResponse.build(server=self.server, status_code=404, reason="Not Found")

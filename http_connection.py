@@ -23,6 +23,11 @@ class HTTPConnection:
         if self.encryptor:
             data = self.encryptor.encrypt(data)
         self.conn.sendall(data)
+    
+    def send(self, data : bytes):
+        if self.encryptor:
+            data = self.encryptor.encrypt(data)
+        self.conn.send(data)
 
     def settimeout(self, timeout : float):
         self.conn.settimeout(timeout)
