@@ -16,8 +16,9 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-height: 100vh;
             line-height: 1.6;
+            height: 100vh;
+            padding: 0;
         }
 
         h1 {
@@ -49,27 +50,29 @@
 
         #file-explorer-panel {
             border: 2px solid white;
-            background-color: white; /* Set a light background color */
+            background-color: white;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            padding: 10px;
-            margin: 10px;
-            width: 60%;
+            width: 90%;
             display: flex;
             flex-direction: column;
             align-items: center;
+            overflow-y: auto;
+            flex: 8;
+            position: relative;
+            margin-bottom: 140px;
         }
 
         #progress {
-            width: 80%;
+            width: 100%;
             max-width: 800px;
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: center;
         }
 
         #progress-text {
             font-size: 1.2rem;
-            /* margin: 1rem 0; */
         }
 
         #progress-bar {
@@ -89,18 +92,38 @@
             padding: 0;
             text-align: left;
             width: 100%;
-            max-width: 800px;
+            max-width: 1200px;
         }
 
-        li {
+        .upload {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            padding: 10px;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: start;
-            margin: 1rem 0;
-            font-size: 1.5rem;
-            padding-left: 0;
-            font-size: 1.2rem;
+            justify-content: center;
+            flex: 1;
         }
+
+        .title {
+            display: flex;
+            flex: 1;
+            position: relative;
+            width: 100%;
+            align-self: center;
+            justify-content: center;
+        }
+
+        /*li {*/
+        /*    display: flex;*/
+        /*    align-items: center;*/
+        /*    justify-content: start;*/
+        /*    margin: 1rem 0;*/
+        /*    padding-left: 0;*/
+        /*    font-size: 1.2rem;*/
+        /*}*/
 
         li a {
             flex-grow: 1;
@@ -130,8 +153,15 @@
             box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2);
         }
 
+        input[type="text"] {
+            border: 2px solid #dddddd;
+            padding: 1rem;
+            margin: 0 0.5rem 0.5rem 0;
+            font-size: 1.2rem;
+            display: flex;
+        }
+
         button {
-            background-color: #ff4d4d;
             color: white;
             margin-left: 5px;
             padding: 0.5rem 1rem;
@@ -139,12 +169,29 @@
             cursor: pointer;
             border-radius: 5px;
             transition: background-color 0.3s, box-shadow 0.3s;
-            font-size: 1.2rem;
+            font-size: 1.3rem;
+            font-weight: normal;
         }
 
         button:hover {
             background-color: #cc0000;
             box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        .delete {
+            background-color: #F50000;
+        }
+
+        .rename {
+            background-color: #3382D7;
+        }
+
+        .delete:hover {
+            background-color: #CC0000;
+        }
+
+        .rename:hover {
+            background-color: #256DBA;
         }
 
         #fileInput {
@@ -153,22 +200,95 @@
             display: inline-block;
         }
 
+        .file-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .file-list li {
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+            background-color: #f9f9f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 1rem 0;
+            font-size: 1.2rem;
+            max-height: 40px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #mkdirInput {
+            padding: 10px 15px;
+            border: 2px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 1rem;
+            margin-right: 10px;
+        }
+
+        #mkdirButton {
+            padding: 10px 15px;
+            border: none; /* No border for a more modern look */
+            border-radius: 4px; /* Match the input's border-radius */
+            background-color: #008CBA; /* A pleasant shade of blue */
+            color: white; /* White text for contrast */
+            font-size: 1rem; /* Match the input's font size */
+            cursor: pointer; /* Cursor effect to show it's clickable */
+            transition: background-color 0.3s; /* Smooth transition for hover effect */
+        }
+
+        #mkdirButton:hover {
+            background-color: #007B9A;
+        }
+
+        #mkdirInput, #mkdirButton {
+            vertical-align: middle;
+        }
+
+        .mkdir-container {
+            position: absolute;
+            top: 50%;
+            margin-right: -60%;
+            transform: translateY(-10%);
+            display: flex;
+        }
     </style>
 </head>
-<div id="file-explorer-panel">
-    <body>
+<div class="title">
     <h1>{{ current_path }}</h1>
-    <ul>
+    <div class="mkdir-container">
+        <label for="mkdirInput"></label><input type="text" placeholder="newFolder" id="mkdirInput">
+        <button id="mkdirButton" onclick="create_directory(document.getElementById('mkdirInput').value)">Create Folder
+        </button>
+    </div>
+</div>
+<div id="file-explorer-panel">
+    <ul class="file-list">
         {% for file in files %}
         <li>
             <a href="{{ file[0] | e}}" {{ 'download' if not file[2] else '' }}>{{ file[1] | e}}</a>
+            {% if file[1] != '../' %}
+            <label for="file-{{ loop.index0 }}"></label><input type="text" placeholder="{{ file[1] | e }}"
+                                                               class="nameInput" id="file-{{ loop.index0 }}"
+                                                               style="height: 10px; align-self: center">
+            <button class="rename"
+                    onclick="rename('{{ file[1] | e }}', document.getElementById('file-{{ loop.index0 }}').value)">
+                Rename
+            </button>
+            {% endif %}
             {% if not file[2] %}
-            <button onclick="deleteFile('{{ file[0] | e}}')">Delete</button>
+            <button class="delete" onclick="deleteFile('{{ file[0] | e}}')">Delete</button>
+            {% else %}
+            <button class="delete" onclick="deleteFile('{{ file[0] | e}}')" style="visibility: hidden">Delete</button>
             {% endif %}
         </li>
         {% endfor %}
     </ul>
-
+</div>
+<div class="upload">
     <form id="uploadForm">
         <input type="file" name="file" id="fileInput" multiple>
         <input type="button" value="Upload" onclick="uploadFile()">
@@ -217,6 +337,7 @@
     }
 
     resetProgress();
+
     function deleteFile(path) {
         if (!confirm("Are you sure to delete this file?")) {
             return;
@@ -244,7 +365,7 @@
             alert("Please select a file first!");
             return;
         }
-
+        document.getElementById('uploadForm').classList.add('hidden');
         var formData = new FormData();
         for (var i = 0; i < fileInput.files.length; i++) {
             formData.append("file", fileInput.files[i]);
@@ -256,7 +377,7 @@
         xhr.upload.onprogress = function (event) {
             if (event.lengthComputable) {
                 var percentComplete = Math.min(0.99, (event.loaded / event.total)) * 100;
-                document.getElementById("progress-text").textContent = percentComplete.toFixed(2) + "%" + " / " + (event.loaded / ((new Date().getTime() - time) / 1000) / 1024 / 1024).toFixed(2)+ "Mb/s";
+                document.getElementById("progress-text").textContent = percentComplete.toFixed(2) + "%" + " / " + (event.loaded / ((new Date().getTime() - time) / 1000) / 1024 / 1024).toFixed(2) + "Mb/s";
                 if (event.loaded / event.total > 0.9999)
                     document.getElementById("progress-text").textContent = "Upload completed. Processing file...";
                 document.getElementById("progress-bar").style.width = percentComplete + "%";
@@ -265,7 +386,6 @@
 
         xhr.onload = function () {
             if (xhr.status === 200) {
-                
                 alert("Upload successfully!");
                 resetProgress();
                 location.reload();
@@ -288,7 +408,7 @@
         document.getElementById("progress").style.display = "none";
         document.getElementById("progress-text").textContent = "0.00%"
         document.getElementById("progress-bar").style.width = "0%";
+        document.getElementById('uploadForm').classList.remove('hidden');
     }
 </script>
-</body>
 </html>
