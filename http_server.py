@@ -15,11 +15,12 @@ import uuid as ud
 import tempfile
 import time
 
+
 class HTTPServer:
 
     def __init__(self, host: str = "localhost", port: int = 8080, parallel: int = 5, timeout: int = 10, cookie_persist_time: int = 3600, debug: bool = False, server: str = "CS305 HTTP Server/1.0", upload_chunk_size: int = 1024 * 1024 * 100):
         self.log = Log(
-            f"logs{ os.path.sep }log_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
+            f"logs{os.path.sep}log_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
         self.host = host
         self.port = port
         self.debug = debug
@@ -214,9 +215,9 @@ class HTTPServer:
                     body += conn.recv(min(self.upload_chunk_size, content_length -
                                       _len))
         aes_encryptor = AESEncryptor()
-        data = RSAEncryptor.encrypt(aes_encryptor.get_key() + aes_encryptor.get_iv(), body)
+        data = RSAEncryptor.encrypt(
+            aes_encryptor.get_key() + aes_encryptor.get_iv(), body)
         return HTTPResponse.build(server=self.server, status_code=200, reason="OK", body=(HTTPBodyType.TEXT, data), content_type="encryption/aes-key"), aes_encryptor
-        
 
     def handle_request_post(self, conn: HTTPConnection, http_request: HTTPRequest) -> HTTPResponse:
         uri = http_request.get_uri()
@@ -235,7 +236,7 @@ class HTTPServer:
 
         if not os.path.exists(abs_file_path):
             return HTTPResponse.build(server=self.server, status_code=404, reason="Not Found")
-        
+
         if uri.lower() == "/upload":
             headers = http_request.get_headers()
             if "Rename" in headers:
@@ -245,7 +246,7 @@ class HTTPServer:
                 if os.path.exists(new_name):
                     return HTTPResponse.build(server=self.server, status_code=401, reason="File already exists")
                 os.rename(abs_file_path, new_name)
-                return HTTPResponse.build(server=self.server, status_code=200, reason="OK")
+                return HTTPResponse.build(server=self.server, status_code=200, reason="OK", set_cookie=f"session-id={str(uuid)}; Max-Age: {self.cookie_persist_time}")
             if os.path.isfile(abs_file_path):
                 return HTTPResponse.build(server=self.server, status_code=401, reason="You can not upload any thing to a file")
             if "Directory" in headers:
@@ -254,7 +255,8 @@ class HTTPServer:
                     dir_name = dir_name[1:]
                 if dir_name.endswith("/"):
                     dir_name = dir_name[:-1]
-                dir_name = utils.normalize_and_validate_path(os.path.sep, dir_name)
+                dir_name = utils.normalize_and_validate_path(
+                    os.path.sep, dir_name)
                 if dir_name is None:
                     return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
                 if dir_name.startswith("/"):
@@ -264,7 +266,7 @@ class HTTPServer:
                     os.makedirs(abs_dir)
                 else:
                     return HTTPResponse.build(server=self.server, status_code=401, reason="Directory already exists")
-                return HTTPResponse.build(server=self.server, status_code=200, reason="OK")
+                return HTTPResponse.build(server=self.server, status_code=200, reason="OK", set_cookie=f"session-id={str(uuid)}; Max-Age: {self.cookie_persist_time}")
             if "Content-Type" in headers:
                 if "boundary=" not in headers["Content-Type"]:
                     return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
@@ -333,7 +335,7 @@ class HTTPServer:
                                     if next_line and (next_line.startswith(boundary) or next_line.startswith(b"--" + boundary)):
                                         line = line[:-len(b'\r\n')]
                                     current_file.write(line)
-                                return HTTPResponse.build(server=self.server, status_code=200, reason="OK")
+                                return HTTPResponse.build(server=self.server, status_code=200, reason="OK", set_cookie=f"session-id={str(uuid)}; Max-Age: {self.cookie_persist_time}")
                             body = conn.recv(self.upload_chunk_size)
                             if not body:
                                 return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
@@ -343,7 +345,7 @@ class HTTPServer:
             if os.path.isdir(abs_file_path):
                 return HTTPResponse.build(server=self.server, status_code=401, reason="You can not delete a directory")
             os.remove(abs_file_path)
-            return HTTPResponse.build(server=self.server, status_code=200, reason="OK")
+            return HTTPResponse.build(server=self.server, status_code=200, reason="OK", set_cookie=f"session-id={str(uuid)}; Max-Age: {self.cookie_persist_time}")
         else:
             return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
 
@@ -357,7 +359,7 @@ class HTTPServer:
                 while _len < content_length:
                     _len += min(self.upload_chunk_size, content_length - _len)
                     conn.recv(min(self.upload_chunk_size, content_length -
-                                      _len))
+                                  _len))
         uri = http_request.get_uri()
         if uri == "/":
             user, password, is_cookie = self._get_request_auth(
@@ -393,7 +395,7 @@ class HTTPServer:
 
             if not os.path.exists(abs_file_path):
                 return HTTPResponse.build(server=self.server, status_code=404, reason="Not Found")
-            
+
             if os.path.isdir(abs_file_path):
                 sustech_http = False
                 if "SUSTech-HTTP" in http_request.parameters:
@@ -406,7 +408,7 @@ class HTTPServer:
                                           reason="OK",
                                           content_type=(
                                               "text/html" if not sustech_http else "text/plain") + "; charset=utf-8",
-                                          set_cookie="session-id=" + str(cookie_uuid))
+                                          set_cookie=f"session-id={str(cookie_uuid)}; Max-Age: {self.cookie_persist_time}")
             else:
                 file_type = mimetypes.guess_type(abs_file_path)[0]
                 if file_type is None:
@@ -426,10 +428,10 @@ class HTTPServer:
                                               reason="Partial Content",
                                               content_type=file_type,
                                               ranges=ranges,
-                                              set_cookie="session-id=" + str(cookie_uuid))
+                                              set_cookie=f"session-id={str(cookie_uuid)}; Max-Age: {self.cookie_persist_time}")
                 return HTTPResponse.build(server=self.server, body=(HTTPBodyType.FILE, abs_file_path),
                                           status_code=200,
                                           reason="OK",
                                           content_type=file_type,
-                                          set_cookie="session-id=" + str(cookie_uuid))
+                                          set_cookie=f"session-id={str(cookie_uuid)}; Max-Age: {self.cookie_persist_time}")
         return HTTPResponse.build(server=self.server, status_code=404, reason="Not Found")
