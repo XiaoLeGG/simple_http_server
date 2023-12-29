@@ -170,10 +170,10 @@ class HTTPServer:
         if path.endswith("/"):
             path = path[:-1]
 
-        file_path = utils.normalize_and_validate_path("/", path)
-        root_user = file_path.split("/")[1]
-        if file_path.startswith("/"):
-            file_path = file_path[1:]
+        file_path = utils.normalize_and_validate_path(os.path.sep, path)
+        root_user = file_path.split(os.path.sep)[1]
+        if file_path.startswith(os.path.sep):
+            file_path = file_path[len(os.path.sep):]
         abs_file_path = os.path.join(utils.get_data_dir(), file_path)
 
         return file_path, root_user, abs_file_path
@@ -194,12 +194,12 @@ class HTTPServer:
             return (401, "Wrong password", None)
         if is_cookie:
             cookie_uuid = ud.UUID(password)
-            utils.resign_cookie(cookie_uuid, self.cookie_persist_time)
         else:
             cookie_uuid = utils.get_cookie_by_user(uuid)
             if cookie_uuid is None:
                 cookie_uuid = utils.generate_cookie(
                     uuid, self.cookie_persist_time)
+        utils.resign_cookie(cookie_uuid, self.cookie_persist_time)
         return (200, "", cookie_uuid)
 
     def hanlde_request_encrypt(self, conn: HTTPConnection, http_request: HTTPRequest) -> HTTPResponse:
@@ -240,7 +240,10 @@ class HTTPServer:
             if "Rename" in headers:
                 rename = headers["Rename"]
                 rename = os.path.basename(rename)
-                os.rename(abs_file_path, os.path.join(os.path.dirname(abs_file_path), rename))
+                new_name = os.path.join(os.path.dirname(abs_file_path), rename)
+                if os.path.exists(new_name):
+                    return HTTPResponse.build(server=self.server, status_code=401, reason="File already exists")
+                os.rename(abs_file_path, new_name)
                 return HTTPResponse.build(server=self.server, status_code=200, reason="OK")
             if os.path.isfile(abs_file_path):
                 return HTTPResponse.build(server=self.server, status_code=401, reason="You can not upload any thing to a file")
@@ -250,7 +253,7 @@ class HTTPServer:
                     dir_name = dir_name[1:]
                 if dir_name.endswith("/"):
                     dir_name = dir_name[:-1]
-                dir_name = utils.normalize_and_validate_path("/", dir_name)
+                dir_name = utils.normalize_and_validate_path(os.path.sep, dir_name)
                 if dir_name is None:
                     return HTTPResponse.build(server=self.server, status_code=401, reason="Bad Request")
                 if dir_name.startswith("/"):
@@ -258,6 +261,8 @@ class HTTPServer:
                 abs_dir = os.path.join(abs_file_path, dir_name)
                 if not os.path.exists(abs_dir):
                     os.makedirs(abs_dir)
+                else:
+                    return HTTPResponse.build(server=self.server, status_code=401, reason="Directory already exists")
                 return HTTPResponse.build(server=self.server, status_code=200, reason="OK")
             if "Content-Type" in headers:
                 if "boundary=" not in headers["Content-Type"]:
@@ -371,10 +376,10 @@ class HTTPServer:
                                       headers={"Location": f"/{user}"})
 
         else:
-            file_path, root_user, abs_file_path = self._normalize_uri_path(uri)
-            if file_path.startswith("/favicon.ico"):
+            if uri.lower().startswith("/favicon.ico"):
                 return HTTPResponse.build(server=self.server, status_code=404,
                                           reason="Not Found")
+            file_path, root_user, abs_file_path = self._normalize_uri_path(uri)
             user, password, is_cookie = self._get_request_auth(
                 http_request.get_headers())
             auth_code, msg, cookie_uuid = self._verify_auth(
