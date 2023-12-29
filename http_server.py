@@ -239,7 +239,8 @@ class HTTPServer:
             headers = http_request.get_headers()
             if "Rename" in headers:
                 rename = headers["Rename"]
-                os.rename(abs_file_path, rename)
+                rename = os.path.basename(rename)
+                os.rename(abs_file_path, os.path.join(os.path.dirname(abs_file_path), rename))
                 return HTTPResponse.build(server=self.server, status_code=200, reason="OK")
             if os.path.isfile(abs_file_path):
                 return HTTPResponse.build(server=self.server, status_code=401, reason="You can not upload any thing to a file")
