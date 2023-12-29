@@ -37,10 +37,10 @@ def verify_user(uuid : ud.UUID, password : str) -> bool:
         return True
     
 def get_root_dir() -> str:
-    return "./"
+    return f".{ os.path.sep } "
 
 def get_data_dir() -> str:
-    data_dir = "./data"
+    data_dir = f".{ os.path.sep }data"
     if not os.path.exists(data_dir):
         os.mkdir(data_dir)
     return data_dir
@@ -193,9 +193,9 @@ def file_explore_html(dir : str, user_name : str, abs_dir : str, uuid : ud.UUID=
     for file in abs_files:
         file_name = os.path.basename(file)
         if os.path.isdir(os.path.join(abs_dir, file)):
-            files.append((file_name + "/", file_name + "/", True))
+            files.append(("/" + dir + "/" + file_name + "/", file_name + "/", True))
         else:
-            files.append((file_name, file_name, False))
+            files.append(("/" + dir + "/" + file_name, file_name, False))
     
     files.sort(key=lambda x: (not x[2], x[1]))
 
@@ -208,12 +208,15 @@ def filter_path(path : str) -> str:
     path = path.replace("//", "/")
 
 def normalize_and_validate_path(base_path : str, request_uri : str) -> str:
+    
     if request_uri.startswith("/"):
         request_uri = request_uri[1:]
+    base_path = os.path.normpath(base_path)
+    request_uri = os.path.normpath(request_uri)
     normalized_path = os.path.normpath(os.path.join(base_path, request_uri))
     if os.path.commonprefix([normalized_path, base_path]) != base_path:
         return None
-
+    
     return normalized_path
 
 def unquote_uri(s):

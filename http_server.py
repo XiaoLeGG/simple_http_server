@@ -19,7 +19,7 @@ class HTTPServer:
 
     def __init__(self, host: str = "localhost", port: int = 8080, parallel: int = 5, timeout: int = 10, cookie_persist_time: int = 3600, debug: bool = False, server: str = "CS305 HTTP Server/1.0", upload_chunk_size: int = 1024 * 1024 * 100):
         self.log = Log(
-            f"logs/log_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
+            f"logs{ os.path.sep }log_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
         self.host = host
         self.port = port
         self.debug = debug
