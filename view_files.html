@@ -269,8 +269,8 @@
     <ul class="file-list">
         {% for file in files %}
         <li>
-            {% if file[1] != '../' %}
             <a href="{{ file[0] | e}}" {{ 'download' if not file[2] else '' }}>{{ file[1] | e}}</a>
+            {% if file[1] != '../' %}
             <label for="file-{{ loop.index0 }}"></label><input type="text" placeholder="{{ file[1] | e }}"
                                                                class="nameInput" id="file-{{ loop.index0 }}"
                                                                style="height: 10px; align-self: center">
@@ -278,9 +278,11 @@
                     onclick="rename('{{ file[1] | e }}', document.getElementById('file-{{ loop.index0 }}').value)">
                 Rename
             </button>
-            <% endif %>
+            {% endif %}
             {% if not file[2] %}
             <button class="delete" onclick="deleteFile('{{ file[0] | e}}')">Delete</button>
+            {% else %}
+            <button class="delete" onclick="deleteFile('{{ file[0] | e}}')" style="visibility: hidden">Delete</button>
             {% endif %}
         </li>
         {% endfor %}
