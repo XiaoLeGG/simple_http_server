@@ -20,7 +20,7 @@ For more features, try it out!
 
 ## Install
 
-```bash
+```cmd
 conda create -n simple-http-server python pip
 conda activate simple-http-server
 pip install cryptography
@@ -30,16 +30,16 @@ pip install sqlite3
 ```
 ## Run
 
-```bash
+```cmd
 python server.py
 ```
 
 For advanced usage:
-```bash
+```cmd
 python server.py -h
 ```
 
-```bash
+```cmd
 usage: server.py [-h] [-i IP] [-p PORT] [--parallel PARALLEL] [-t TIMEOUT] [-c COOKIE_PERSIST_TIME] [-d DEBUG]
                  [-s SERVER]
 
