@@ -16,7 +16,7 @@
             letter-spacing: 1px;
         }
 
-        .container {
+        #login, #register {
             width: 100%;
             max-width: 500px;
             padding: 40px;
@@ -24,6 +24,8 @@
             border-radius: 10px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             background-color: rgba(240, 255, 255, 0.9);
+            transition: opacity 0.3s ease;
+            opacity: 1;
         }
 
         .form-group {
@@ -57,14 +59,72 @@
             border-radius: 3px;
             cursor: pointer;
             transition: background-color 0.3s, transform 0.3s;
+            font-weight: bold;
+            font-size: 16px;
         }
 
         .form-group button:hover {
             background-color: #0056b3;
             transform: scale(1.05);
         }
+
+        #change2r, #change2l {
+            display: block;
+            text-align: right;
+            margin-top: 20px;
+            color: #007bff;
+            font-weight: bold;
+        }
     </style>
     <script>
+        window.onload = function () {
+            document.getElementById('usernameR').addEventListener('input', checkRegisterConditions);
+            document.getElementById('passwordR').addEventListener('input', checkRegisterConditions);
+            document.getElementById('passwordRcheck').addEventListener('input', checkRegisterConditions);
+            document.getElementById('username').addEventListener('input', checkLoginConditions);
+            document.getElementById('password').addEventListener('input', checkLoginConditions);
+            checkRegisterConditions();
+            checkLoginConditions();
+        }
+
+        function checkRegisterConditions() {
+            var username = document.getElementById('usernameR').value;
+            var password1 = document.getElementById('passwordR').value;
+            var password2 = document.getElementById('passwordRcheck').value;
+            var registerButton = document.getElementById('registerButton');
+            var isFormFilled = username && password1 && password2;
+            var isPasswordMatch = password1 === password2;
+
+            if (isFormFilled && isPasswordMatch) {
+                registerButton.disabled = false;
+                registerButton.style.backgroundColor = "";
+                registerButton.textContent = "Register";
+            } else {
+                registerButton.disabled = true;
+                registerButton.style.backgroundColor = "gray";
+                if (!isFormFilled) {
+                    registerButton.textContent = "Please fill all fields";
+                } else {
+                    registerButton.textContent = "Password not match";
+                }
+            }
+        }
+
+        function checkLoginConditions() {
+            var username = document.getElementById('username').value;
+            var password = document.getElementById('password').value;
+            var loginButton = document.getElementById('loginButton');
+            var isFormFilled = username && password
+
+            if (isFormFilled) {
+                loginButton.disabled = false;
+                loginButton.style.backgroundColor = "";
+            } else {
+                loginButton.disabled = true;
+                loginButton.style.backgroundColor = "gray";
+            }
+        }
+
         function login() {
             var username = document.getElementById("username").value;
             var password = document.getElementById("password").value;
@@ -82,10 +142,55 @@
                 location.reload();
             }
         }
+
+        function register() {
+            var username = document.getElementById("usernameR").value;
+            var password = document.getElementById("passwordR").value;
+            var password_check = document.getElementById("passwordRcheck").value;
+            if (password != password_check) {
+                alert("Password not match!");
+                return;
+            }
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/register?user=" + username + "&password=" + password, true);
+            xhr.send();
+            xhr.onload = function () {
+                if (xhr.status != 200) {
+                    alert("Failed to register: " + xhr.responseText);
+                    return;
+                }
+                alert("Register successfully!");
+                location.reload();
+            }
+        }
+
+        function change2register() {
+            var loginDiv = document.getElementById("login");
+            var registerDiv = document.getElementById("register");
+            loginDiv.style.opacity = '0';
+            setTimeout(function () {
+                loginDiv.style.display = "none";
+                registerDiv.style.display = "block";
+                registerDiv.style.opacity = '1';
+            }, 300);
+        }
+
+        function change2login() {
+            var loginDiv = document.getElementById("login");
+            var registerDiv = document.getElementById("register");
+            registerDiv.style.opacity = '0';
+            setTimeout(function () {
+                registerDiv.style.display = "none";
+                loginDiv.style.display = "block";
+                loginDiv.style.opacity = '1';
+            }, 300);
+        }
+
+
     </script>
 </head>
 <body>
-<div class="container">
+<div id="login">
     <h2>Login</h2>
     <form>
         <div class="form-group">
@@ -97,8 +202,30 @@
             <input type="password" id="password" name="password" placeholder="Enter your password">
         </div>
         <div class="form-group">
-            <button type="button" onclick="login()">Login</button>
+            <button type="button" onclick="login()" id="loginButton">Login</button>
         </div>
+        <a href="#" id="change2r" onclick="change2register()">register</a>
+    </form>
+</div>
+<div id="register" style="display: none">
+    <h2>Register</h2>
+    <form>
+        <div class="form-group">
+            <label for="username">Username:</label>
+            <input type="text" id="usernameR" name="username" placeholder="Enter your username">
+        </div>
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="passwordR" name="password" placeholder="Enter your password">
+        </div>
+        <div class="form-group">
+            <label for="passwordRCheck">Password Check:</label>
+            <input type="password" id="passwordRcheck" name="passwordCheck" placeholder="Enter your password again">
+        </div>
+        <div class="form-group">
+            <button type="button" onclick="register()" id="registerButton">Register</button>
+        </div>
+        <a href="#" id="change2l" onclick="change2login()">login</a>
     </form>
 </div>
 </body>
