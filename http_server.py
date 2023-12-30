@@ -394,7 +394,7 @@ class HTTPServer:
                                           reason="login failed")
             return HTTPResponse.build(server=self.server, status_code=302,
                                       reason="Found",
-                                      headers={"Location": f"/{user}?{"&".join([f"{key}={value}" for key, value in http_request.parameters.items()])}"})
+                                      headers={"Location": f"/{user}{"?" if http_request.parameters and len(http_request.parameters) > 0 else ""}{"&".join([f"{key}={value}" for key, value in http_request.parameters.items()])}"})
 
         else:
             if uri.lower().startswith("/favicon.ico"):
