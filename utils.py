@@ -233,21 +233,35 @@ def unquote_uri(s):
     return decoded_bytes.decode('utf-8')
 
 def parse_ranges(ranges : str, file_size : int) -> list[tuple]:
-    ranges = ranges[len("bytes="):]
+    if ranges.lower().startswith("bytes="):
+        ranges = ranges[len("bytes="):]
     ranges = ranges.split(",")
     result = []
     for _range in ranges:
-        if _range.startswith("-"):
-            end = int(_range[1:])
-            start = file_size - end
-            end = file_size - 1
+        if "-" not in _range:
+            start = end = int(_range)
         elif _range.endswith("-"):
             start = int(_range[:-1])
+            if start < 0:
+                start = start + file_size
             end = file_size - 1
+        elif _range.startswith("-"):
+            parts = _range.split("-")
+            start = file_size - int(parts[1])
+            if len(parts) == 2:
+                end = file_size - 1
+            else:
+                if len(parts[2]) == 0:
+                    end = file_size - int(parts[3])
+                else:
+                    end = int(parts[2])
         else:
-            start, end = _range.split("-")
-            start = int(start)
-            end = int(end)
+            parts = _range.split("-")
+            start = int(parts[0])
+            if len(parts[1]) == 0:
+                end = file_size - int(parts[2])
+            else:
+                end = int(parts[1])
         if start > end:
             return None
         if start >= file_size:
