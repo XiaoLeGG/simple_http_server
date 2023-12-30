@@ -193,9 +193,9 @@ def file_explore_html(dir : str, user_name : str, abs_dir : str, uuid : ud.UUID=
     for file in abs_files:
         file_name = os.path.basename(file)
         if os.path.isdir(os.path.join(abs_dir, file)):
-            files.append(("/" + dir + "/" + file_name + "/", file_name + "/", True))
+            files.append(("/" + dir + "/" + file_name + "/", file_name + "/", True, 0))
         else:
-            files.append(("/" + dir + "/" + file_name, file_name, False))
+            files.append(("/" + dir + "/" + file_name, file_name, False, os.path.getsize(file)))
     
     files.sort(key=lambda x: (not x[2], x[1]))
 
