@@ -233,7 +233,8 @@ def unquote_uri(s):
     return decoded_bytes.decode('utf-8')
 
 def parse_ranges(ranges : str, file_size : int) -> list[tuple]:
-    ranges = ranges[len("bytes="):]
+    if ranges.lower().startswith("bytes="):
+        ranges = ranges[len("bytes="):]
     ranges = ranges.split(",")
     result = []
     for _range in ranges:

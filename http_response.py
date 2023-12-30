@@ -32,6 +32,8 @@ class HTTPResponse:
         ranges : list=None,
         server : str="CS305 HTTP Server/1.0",
         headers : dict[str, str]=None,
+        chunked : bool=False,
+        is_head : bool=False,
         **kwargs
         ) -> "HTTPResponse":
 
@@ -46,10 +48,10 @@ class HTTPResponse:
             headers["Keep-Alive"] = f"timeout={timeout}; max={max}"
         if set_cookie:
             headers["Set-Cookie"] = set_cookie
-        return cls(version, status_code, reason, headers, body, ranges)
+        return cls(version=version, status_code=status_code, reason=reason, headers=headers, body=body, ranges=ranges, is_head=is_head, chunked=chunked)
 
 
-    def __init__(self, version : str, status_code : int, reason : str, headers : dict, body : tuple, ranges : list, is_head : bool=False):
+    def __init__(self, version : str, status_code : int, reason : str, headers : dict, body : tuple, ranges : list, is_head : bool=False, chunked=False):
         self.status_code = status_code
         self.reason = reason
         self.headers = headers
@@ -57,6 +59,7 @@ class HTTPResponse:
         self.version = version
         self.ranges = ranges
         self.is_head = is_head
+        self.chunked = chunked
 
     def get_status_code(self) -> int:
         return self.status_code
@@ -123,42 +126,49 @@ class HTTPResponse:
                     self.reason = "Partial Content"
                     boundary = "CS305v" + "{:05}".format(random.randint(0, 99999))
                     origin_content_type = self.headers["Content-Type"]
-                    self.headers["Content-Type"] = "multipart/byteranges; boundary=" + boundary
+                    use_boundary = len(self.ranges) > 1
+                    if use_boundary:
+                        self.headers["Content-Type"] += f"multipart/byteranges; boundary={boundary}"
                     content_ranges = "bytes " + ",".join([f"{start}-{end}/{file_size}" for start, end in self.ranges])
                     self.headers["Content-Range"] = content_ranges
-                    # _content_length = 0
-                    # for start, end in self.ranges:
-                    #     _content_length += len(b"--" + boundary.encode() + b"\r\n")
-                    #     _content_length += len(b"Content-Type: " + origin_content_type.encode() + b"\r\n")
-                    #     _content_length += len(b"Content-Range: bytes " + str(start).encode() + b"-" + str(end).encode() + b"/" + str(file_size).encode() + b"\r\n")
-                    #     _content_length += len(b"Content-Length: " + str(end - start + 1).encode() + b"\r\n")
-                    #     _content_length += len(b"\r\n")
-                    #     _content_length += end - start + 1
-                    #     _content_length += len(b'\r\n\r\n')
-                    # _content_length += len(b"--" + boundary.encode() + b"--")
-                    # self.headers["Content-Length"] = _content_length
+                    self.headers["Content-Length"] = self.ranges[0][1] - self.ranges[0][0] + 1
+                    _content_length = 0
+                    for start, end in self.ranges:
+                        if use_boundary:
+                            _content_length += len(b"--" + boundary.encode() + b"\r\n")
+                            _content_length += len(b"Content-Type: " + origin_content_type.encode() + b"\r\n")
+                            _content_length += len(b"Content-Range: bytes " + str(start).encode() + b"-" + str(end).encode() + b"/" + str(file_size).encode() + b"\r\n")
+                            _content_length += len(b"Content-Length: " + str(end - start + 1).encode() + b"\r\n")
+                            _content_length += len(b"\r\n")
+                        _content_length += end - start + 1
+                        _content_length += len(b'\r\n\r\n')
+                    if use_boundary:
+                        _content_length += len(b"--" + boundary.encode() + b"--")
+                    self.headers["Content-Length"] = _content_length
                     conn.sendall(self._build_headers().encode())
                     if self.is_head:
                         return
                     for start, end in self.ranges:
-                        conn.sendall(b"--" + boundary.encode() + b"\r\n")
-                        conn.sendall(f"Content-Type: {origin_content_type}".encode() + b"\r\n")
-                        conn.sendall(f"Content-Range: bytes {start}-{end}/{file_size}".encode() + b"\r\n")
-                        conn.sendall(f"Content-Length: {end - start + 1}".encode() + b"\r\n")
+                        if use_boundary:
+                            conn.sendall(b"--" + boundary.encode() + b"\r\n")
+                            conn.sendall(f"Content-Type: {origin_content_type}".encode() + b"\r\n")
+                            conn.sendall(f"Content-Range: bytes {start}-{end}/{file_size}".encode() + b"\r\n")
+                            conn.sendall(f"Content-Length: {end - start + 1}".encode() + b"\r\n")
+                            conn.sendall(b"\r\n")
                         file.seek(start)
-                        conn.sendall(b"\r\n")
                         rest_data_len = end - start + 1
                         while rest_data_len > 0:
                             data = file.read(min(rest_data_len, DOWNLOAD_SPEED))
                             conn.sendall(data)
                             rest_data_len -= min(rest_data_len, DOWNLOAD_SPEED)
                         conn.sendall(b"\r\n\r\n")
-                    conn.sendall(b"--" + boundary.encode() + b"--\r\n\r\n")
+                    if use_boundary:
+                        conn.sendall(b"--" + boundary.encode() + b"--\r\n\r\n")
                     return
                 else:
                     
                     # Transfer-Encoding
-                    if file_size > DOWNLOAD_SPEED * 10:
+                    if self.chunked:
                         # response_builder.append(f"Content-Length: 0\r\n")
                         self.headers["Transfer-Encoding"] = "chunked"
                         headers_str = self._build_headers()
@@ -184,7 +194,12 @@ class HTTPResponse:
                         conn.sendall(self._build_headers().encode())
                         if self.is_head:
                             return
-                        conn.sendall(file.read())
+                        file.seek(0)
+                        rest_data_len = file_size
+                        while rest_data_len > 0:
+                            data = file.read(min(rest_data_len, DOWNLOAD_SPEED))
+                            conn.sendall(data)
+                            rest_data_len -= min(rest_data_len, DOWNLOAD_SPEED)
                         conn.sendall(b"\r\n\r\n")
                         return
 
