@@ -219,8 +219,23 @@ class HTTPServer:
 
     def handle_request_post(self, conn: HTTPConnection, http_request: HTTPRequest) -> HTTPResponse:
         uri = http_request.get_uri()
+        
+        if uri.lower() == "/register":
+            if "user" not in http_request.parameters or "password" not in http_request.parameters:
+                return HTTPResponse.build(server=self.server, status_code=400, reason="Bad Request")
+            user = http_request.parameters["user"]
+            password = http_request.parameters["password"]
+            if user is None or password is None or user == "" or password == "":
+                return HTTPResponse.build(server=self.server, status_code=400, reason="Bad Request")
+            try:
+                uuid = utils.create_user(user, password)
+            except Exception as e:
+                return HTTPResponse.build(server=self.server, status_code=400, reason="User already exists")
+            return HTTPResponse.build(server=self.server, status_code=200, reason="OK")
+        
         if "path" not in http_request.parameters:
             return HTTPResponse.build(server=self.server, status_code=400, reason="Invalid Method")
+        
         path = http_request.parameters["path"]
         file_path, root_user, abs_file_path = self._normalize_uri_path(path)
         user, password, is_cookie = self._get_request_auth(
