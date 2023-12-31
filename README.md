@@ -26,7 +26,6 @@ conda activate simple-http-server
 pip install cryptography
 pip install pytz
 pip install jinja2
-pip install sqlite3
 ```
 ## Run
 
