@@ -18,6 +18,7 @@ def generate_test_accounts():
 
 
 if __name__ == "__main__":
+    utils.init_sql()
     generate_test_accounts()
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--ip", type=str, default="localhost", help="Server IP address")
