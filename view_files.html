@@ -184,6 +184,7 @@
 
         .rename {
             background-color: #3382D7;
+            width: 110px;
         }
 
         .delete:hover {
@@ -206,15 +207,16 @@
         }
 
         .file-list li {
-            padding: 10px;
             border-bottom: 1px solid #ccc;
             background-color: #f9f9f9;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             margin: 1rem 0;
             font-size: 1.2rem;
             max-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5em;
+            position: relative;
         }
 
         .hidden {
@@ -255,6 +257,67 @@
             transform: translateY(-10%);
             display: flex;
         }
+
+        .file-size {
+            font-size: 16px;
+            color: #333333;
+            font-weight: bold;
+            background-color: #f4f4f4;
+            border: 1px solid #dddddd;
+            padding: 5px 10px;
+            border-radius: 5px;
+            display: inline-block;
+            min-width: 100px;
+            width: 100px;
+            text-align: center;
+            margin: 5px 1em 5px 0;
+        }
+
+        .file-name {
+            flex-grow: 2;
+            text-align: left;
+            margin-right: 1em;
+        }
+
+        .nameInput {
+            margin: 0.5em 0;
+            padding: 0.5em;
+            border: 1px solid #cccccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 1rem;
+            color: #333333;
+            background-color: #ffffff;
+            width: 0;
+            visibility: hidden;
+            transition: border-color 0.2s, width 0.5s ease, visibility 0s 0.5s; /* 宽度变化的过渡效果，以及可见性的延迟 */
+            position: relative;
+            right: 0;
+        }
+
+        .nameInput.active {
+            width: 300px;
+            visibility: visible;
+            transition: width 0.5s ease;
+        }
+
+        .nameInput:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+
+        .nameInput:hover {
+            border-color: #999999;
+        }
+
+        .confirm {
+            background-color: #4CAF50;
+            width: 110px;
+        }
+
+        .confirm:hover {
+            background-color: #3F9342;
+        }
     </style>
 </head>
 <div class="title">
@@ -269,14 +332,18 @@
     <ul class="file-list">
         {% for file in files %}
         <li>
-            <a href="{{ file[0] | e}}" {{ 'download' if not file[2] else '' }}>{{ file[1] | e}}</a>
+            <a class="file-name" href="{{ file[0] | e}}" {{ 'download' if not file[2] else '' }}>{{ file[1] | e}}</a>
+            <div class="file-size">{{ file[3] | e }}</div>
             {% if file[1] != '../' %}
             <label for="file-{{ loop.index0 }}"></label><input type="text" placeholder="{{ file[1] | e }}"
-                                                               class="nameInput" id="file-{{ loop.index0 }}"
-                                                               style="height: 10px; align-self: center">
-            <button class="rename"
-                    onclick="rename('{{ file[1] | e }}', document.getElementById('file-{{ loop.index0 }}').value)">
+                                                               class="nameInput" id="file-{{ loop.index0 }}">
+            <button class="rename" id="rename-{{ loop.index0 }}"
+                    onclick="rename_active('{{ loop.index0 }}')">
                 Rename
+            </button>
+            <button class="confirm" id="confirm-{{ loop.index0 }}"
+                    onclick="rename('{{ file[1] | e }}', '{{ loop.index0 }}')" style="display: none">
+                Confirm
             </button>
             {% endif %}
             {% if not file[2] %}
@@ -303,20 +370,61 @@
 
 
 <script>
+    function get_size(size_byte) {
+        if (size_byte < 1024)
+            return size_byte + "B";
+        else if (size_byte < 1024 * 1024)
+            return (size_byte / 1024).toFixed(1) + "KB";
+        else if (size_byte < 1024 * 1024 * 1024)
+            return (size_byte / 1024 / 1024).toFixed(1) + "MB";
+        else
+            return (size_byte / 1024 / 1024 / 1024).toFixed(1) + "GB";
+    }
 
-    function rename(file, name) {
+    function load_size() {
+        var fileSizeElements = document.getElementsByClassName('file-size');
+        for (var i = 0; i < fileSizeElements.length; i++) {
+            var element = fileSizeElements[i];
+            var bytes = parseInt(element.innerText);
+            element.innerText = get_size(bytes);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', load_size);
+
+    function rename_active(file_id) {
+        console.log(file_id)
+        var renameInput = document.getElementById('file-' + file_id)
+        console.log(renameInput)
+        renameInput.classList.add('active')
+        document.getElementById('rename-' + file_id).style.display = 'none'
+        document.getElementById('confirm-' + file_id).style.display = 'block'
+    }
+
+    function rename_inactive(file_id) {
+        var renameInput = document.getElementById('file-' + file_id)
+        renameInput.classList.remove('active')
+        document.getElementById('rename-' + file_id).style.display = 'block'
+        document.getElementById('confirm-' + file_id).style.display = 'none'
+        console.log(file_id)
+        console.log('confirm-' + file_id)
+    }
+
+    function rename(file, id) {
         var xhr = new XMLHttpRequest();
+        var name = document.getElementById('file-' + id).value;
         xhr.open("POST", "/upload?path={{ current_path }}/" + file, true);
         xhr.setRequestHeader("Rename", name);
         xhr.send();
         xhr.onload = function () {
             if (xhr.status != 200) {
-                alert("Failed to rename file: " + xhr.responseText);
+                alert("Failed to rename file: " + xhr.statusText);
                 location.reload();
                 return;
             }
             alert("File rename successfully!");
             location.reload();
+            rename_inactive(id);
         }
     }
 
@@ -327,7 +435,10 @@
         xhr.send();
         xhr.onload = function () {
             if (xhr.status != 200) {
-                alert("Failed to create directory: " + xhr.responseText);
+                alert("Failed to create directory: " + xhr.statusText);
+                console.log(xhr.responseText)
+                console.log(xhr.status)
+                console.log(xhr.statusText)
                 location.reload();
                 return;
             }
@@ -348,7 +459,7 @@
         xhr.send();
         xhr.onload = function () {
             if (xhr.status != 200) {
-                alert("Failed to delete file: " + xhr.responseText);
+                alert("Failed to delete file: " + xhr.statusText);
                 location.reload();
                 return;
             }
