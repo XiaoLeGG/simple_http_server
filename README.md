@@ -66,7 +66,7 @@ options:
 
 ![Alt text](assets/register_screenshot_1.png)
 
-![Alt text](assets/register_screenshot_1.png)
+![Alt text](assets/register_screenshot_2.png)
 
 ![Alt text](assets/file_view_screenshot_1.png)
 
