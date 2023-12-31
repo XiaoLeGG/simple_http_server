@@ -186,10 +186,10 @@ def file_explore_html(dir : str, user_name : str, abs_dir : str, uuid : ud.UUID=
         with open("view_files.html", "r", encoding="utf-8") as template_file:
             template_content = template_file.read()
         file_explore_template = Template(template_content)
-    files = []
+    files = [("/" + user_name + "/", "/", True, -1)]
 
     if dir.lower() != user_name:
-        files = [("../", "../", True)]
+        files.append(("../", "../", True, -1))
 
     for file in abs_files:
         file_name = os.path.basename(file)
@@ -198,9 +198,12 @@ def file_explore_html(dir : str, user_name : str, abs_dir : str, uuid : ud.UUID=
         else:
             files.append(("/" + dir + "/" + file_name, file_name, False, os.path.getsize(os.path.join(abs_dir, file_name))))
         
-    
-    files.sort(key=lambda x: (not x[2], x[1]))
-
+    if len(files) > 2:
+        ret = [files[0]]
+        files = files[1:]
+        files.sort(key=lambda x: (not x[2], x[1]))
+        ret.extend(files)
+        files = ret
     
     rendered_html = file_explore_template.render(files=files, user_name=user_name, current_path=dir)
 

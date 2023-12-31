@@ -333,8 +333,8 @@
         {% for file in files %}
         <li>
             <a class="file-name" href="{{ file[0] | e}}" {{ 'download' if not file[2] else '' }}>{{ file[1] | e}}</a>
+            {% if file[1] != '../' and file[1] != '/' %}
             <div class="file-size">{{ file[3] | e }}</div>
-            {% if file[1] != '../' %}
             <label for="file-{{ loop.index0 }}"></label><input type="text" placeholder="{{ file[1] | e }}"
                                                                class="nameInput" id="file-{{ loop.index0 }}">
             <button class="rename" id="rename-{{ loop.index0 }}"
