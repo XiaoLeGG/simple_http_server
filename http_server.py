@@ -180,14 +180,14 @@ class HTTPServer:
 
         return file_path, root_user, abs_file_path
 
-    def _verify_auth(self, root_user: str, user: str, password: str, is_cookie: bool) -> (int, str, ud.UUID):
+    def _verify_auth(self, root_user: str, user: str, password: str, is_cookie: bool, check_permission : bool = True) -> (int, str, ud.UUID):
 
         if user is None:
             return (401, "Authorization Required" if not is_cookie else "Cookie invalid or expired", None)
         uuid = utils.get_user_by_name(user)
         if uuid is None:
             return (401, "User not exists", None)
-        if root_user != user:
+        if check_permission and root_user != user:
             return (403, "Forbidden", None)
         if is_cookie:
             cookie_uuid = ud.UUID(password)
@@ -234,7 +234,7 @@ class HTTPServer:
             return HTTPResponse.build(server=self.server, status_code=200, reason="OK")
         
         if "path" not in http_request.parameters:
-            return HTTPResponse.build(server=self.server, status_code=400, reason="Invalid Method")
+            return HTTPResponse.build(server=self.server, status_code=405, reason="Invalid Method")
         
         path = http_request.parameters["path"]
         file_path, root_user, abs_file_path = self._normalize_uri_path(path)
@@ -368,6 +368,12 @@ class HTTPServer:
             return HTTPResponse.build(server=self.server, status_code=400, reason="Bad Request")
 
     def handle_request_get(self, conn: HTTPConnection, http_request: HTTPRequest) -> HTTPResponse:
+        
+        sustech_http = False
+
+        if "SUSTech-HTTP" in http_request.parameters:
+                if http_request.parameters["SUSTech-HTTP"] == "1":
+                    sustech_http = True
 
         if "Content-Length" in http_request.get_headers():
             content_length = int(http_request.get_headers()["Content-Length"])
@@ -383,6 +389,9 @@ class HTTPServer:
             user, password, is_cookie = self._get_request_auth(
                 http_request.get_headers())
             if not "Authorization" in http_request.get_headers() and user is None:
+                if sustech_http:
+                    return HTTPResponse.build(server=self.server, status_code=401,
+                                          reason="Authorization Required")
                 return HTTPResponse.build(server=self.server, status_code=200,
                                           reason="OK",
                                           content_type="text/html",
@@ -390,21 +399,36 @@ class HTTPServer:
             auth_code, msg, cookie_uuid = self._verify_auth(
                 user, user, password, is_cookie)
             if auth_code != 200:
+                if is_cookie:
+                    return HTTPResponse.build(server=self.server, status_code=200,
+                                          reason="OK",
+                                          content_type="text/html",
+                                          body=(HTTPBodyType.TEXT, utils.login_html()))
                 return HTTPResponse.build(server=self.server, status_code=auth_code,
                                           reason="login failed")
+            
+            if sustech_http:
+                return HTTPResponse.build(server=self.server, status_code=200,
+                                              reason="OK",
+                                              content_type="text/plain",
+                                              body=(HTTPBodyType.TEXT, utils.file_explore_html(
+                    None, None, utils.get_data_dir(), sustech_http=True)),
+                    set_cookie=f"session-id={str(cookie_uuid)}; Max-Age={self.cookie_persist_time}")
+
             return HTTPResponse.build(server=self.server, status_code=302,
                                       reason="Found",
-                                      headers={"Location": f"/{user}{"?" if http_request.parameters and len(http_request.parameters) > 0 else ""}{"&".join([f"{key}={value}" for key, value in http_request.parameters.items()])}"})
+                                      headers={"Location": f"/{user}{"?" if http_request.parameters and len(http_request.parameters) > 0 else ""}{"&".join([f"{key}={value}" for key, value in http_request.parameters.items()])}"},
+                                      set_cookie=f"session-id={str(cookie_uuid)}; Max-Age={self.cookie_persist_time}")
 
         else:
-            if uri.lower().startswith("/favicon.ico"):
-                return HTTPResponse.build(server=self.server, status_code=404,
-                                          reason="Not Found")
             file_path, root_user, abs_file_path = self._normalize_uri_path(uri)
             user, password, is_cookie = self._get_request_auth(
                 http_request.get_headers())
+            
+            # special handling for SUSTech Project, do not check permission on get
+
             auth_code, msg, cookie_uuid = self._verify_auth(
-                root_user, user, password, is_cookie)
+                root_user, user, password, is_cookie, check_permission=False)
 
             if auth_code != 200:
                 return HTTPResponse.build(server=self.server, status_code=auth_code,
@@ -415,10 +439,6 @@ class HTTPServer:
                 return HTTPResponse.build(server=self.server, status_code=404, reason="Not Found")
 
             if os.path.isdir(abs_file_path):
-                sustech_http = False
-                if "SUSTech-HTTP" in http_request.parameters:
-                    if http_request.parameters["SUSTech-HTTP"] == "1":
-                        sustech_http = True
                 html = utils.file_explore_html(
                     file_path, root_user, abs_file_path, sustech_http=sustech_http)
                 return HTTPResponse.build(server=self.server, body=(HTTPBodyType.TEXT, html),
