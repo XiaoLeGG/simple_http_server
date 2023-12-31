@@ -107,8 +107,7 @@ class HTTPServer:
                                       reason="Method Not Allowed"), None
         response.headers["Connection"] = "Keep-Alive" if keep_alive and response.status_code < 300 else "Close"
         if keep_alive:
-            response.headers["Keep-Alive"] = f"timeout={
-                self.timeout}; max={self.parallel}"
+            response.headers["Keep-Alive"] = f"timeout={self.timeout}; max={self.parallel}"
         return response, aes_encryptor
 
     def handle_connection(self, conn: socket.socket, addr: tuple):
@@ -417,7 +416,7 @@ class HTTPServer:
 
             return HTTPResponse.build(server=self.server, status_code=302,
                                       reason="Found",
-                                      headers={"Location": f"/{user}{"?" if http_request.parameters and len(http_request.parameters) > 0 else ""}{"&".join([f"{key}={value}" for key, value in http_request.parameters.items()])}"},
+                                      headers={"Location": f"/{user}" + ("?" if http_request.parameters and len(http_request.parameters) > 0 else "") + ("&".join([f"{key}={value}" for key, value in http_request.parameters.items()]))},
                                       set_cookie=f"session-id={str(cookie_uuid)}; Max-Age={self.cookie_persist_time}")
 
         else:
