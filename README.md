@@ -17,6 +17,9 @@ The server provide cloud storage service with following features:
 
 For more features, try it out!
 
+**Important Warning:**
+- Due to the project description, each user can access to all files under ./data directory, but they can only modified their own files.
+- Due to the project description, we have a special parameter called  ```SUSTech-HTTP``` which may perform different function compared to the common HTTP server.
 
 ## Install
 
