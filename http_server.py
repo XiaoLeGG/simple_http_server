@@ -252,37 +252,45 @@ class HTTPServer:
         if uri.lower() == "/upload":
             headers = http_request.get_headers()
             if "Rename" in headers:
-                rename = headers["Rename"]
-                while rename.endswith("/") or rename.endswith("\\"):
-                    rename = rename[:-1]
-                if "/" in rename:
-                    rename = rename.split("/")[-1]
-                if "\\" in rename:
-                    rename = rename.split("\\")[-1]
-                new_name = os.path.join(os.path.dirname(abs_file_path), rename)
-                if new_name is None or new_name == "":
+                try:
+                    rename = headers["Rename"]
+                    rename = utils.unquote_uri(rename)
+                    while rename.endswith("/") or rename.endswith("\\"):
+                        rename = rename[:-1]
+                    if "/" in rename:
+                        rename = rename.split("/")[-1]
+                    if "\\" in rename:
+                        rename = rename.split("\\")[-1]
+                    new_name = os.path.join(os.path.dirname(abs_file_path), rename)
+                    if new_name is None or new_name == "":
+                        return HTTPResponse.build(server=self.server, status_code=400, reason="Invalid File Name")
+                    if os.path.exists(new_name):
+                        return HTTPResponse.build(server=self.server, status_code=400, reason="File already exists")
+                    os.rename(abs_file_path, new_name)
+                except Exception:
                     return HTTPResponse.build(server=self.server, status_code=400, reason="Invalid File Name")
-                if os.path.exists(new_name):
-                    return HTTPResponse.build(server=self.server, status_code=400, reason="File already exists")
-                os.rename(abs_file_path, new_name)
                 return HTTPResponse.build(server=self.server, status_code=200, reason="OK", set_cookie=f"session-id={str(uuid)}; Max-Age={self.cookie_persist_time}")
             if os.path.isfile(abs_file_path):
                 return HTTPResponse.build(server=self.server, status_code=400, reason="You can not upload any thing to a file")
             if "Directory" in headers:
-                dir_name = headers["Directory"]
-                while dir_name.endswith("/") or dir_name.endswith("\\"):
-                    dir_name = dir_name[:-1]
-                if "/" in dir_name:
-                    dir_name = dir_name.split("/")[-1]
-                if "\\" in dir_name:
-                    dir_name = dir_name.split("\\")[-1]
-                if dir_name is None or dir_name == "":
+                try:
+                    dir_name = headers["Directory"]
+                    dir_name = utils.unquote_uri(dir_name)
+                    while dir_name.endswith("/") or dir_name.endswith("\\"):
+                        dir_name = dir_name[:-1]
+                    if "/" in dir_name:
+                        dir_name = dir_name.split("/")[-1]
+                    if "\\" in dir_name:
+                        dir_name = dir_name.split("\\")[-1]
+                    if dir_name is None or dir_name == "":
+                        return HTTPResponse.build(server=self.server, status_code=400, reason="Invalid Directory Name")
+                    abs_dir = os.path.join(abs_file_path, dir_name)
+                    if not os.path.exists(abs_dir):
+                        os.makedirs(abs_dir)
+                    else:
+                        return HTTPResponse.build(server=self.server, status_code=400, reason="Directory already exists")
+                except Exception:
                     return HTTPResponse.build(server=self.server, status_code=400, reason="Invalid Directory Name")
-                abs_dir = os.path.join(abs_file_path, dir_name)
-                if not os.path.exists(abs_dir):
-                    os.makedirs(abs_dir)
-                else:
-                    return HTTPResponse.build(server=self.server, status_code=400, reason="Directory already exists")
                 return HTTPResponse.build(server=self.server, status_code=200, reason="OK", set_cookie=f"session-id={str(uuid)}; Max-Age={self.cookie_persist_time}")
             if "Content-Type" in headers:
                 if "boundary=" not in headers["Content-Type"]:

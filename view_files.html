@@ -413,15 +413,15 @@
     }
 
     function rename(file, id) {
-        if (!validateFileName(document.getElementById('file-' + id).value)) {
-            alert("Invalid file name!");
-            return;
-        }
+        // if (!validateFileName(document.getElementById('file-' + id).value)) {
+        //     alert("Invalid file name!");
+        //     return;
+        // }
         var xhr = new XMLHttpRequest();
         var name = document.getElementById('file-' + id).value;
-        xhr.open("POST", "/upload?path={{ current_path }}/" + file, true);
-        xhr.setRequestHeader("Rename", name);
-        // xhr.setRequestHeader("Rename", encodeURIComponent(name));
+        xhr.open("POST", "/upload?path={{ current_path }}/" + encodeURIComponent(file), true);
+        // xhr.setRequestHeader("Rename", name);
+        xhr.setRequestHeader("Rename", encodeURIComponent(name));
         xhr.send();
         xhr.onload = function () {
             if (xhr.status != 200) {
@@ -438,7 +438,7 @@
     function create_directory(name) {
         var xhr = new XMLHttpRequest();
         xhr.open("POST", "/upload?path={{ current_path }}", true);
-        xhr.setRequestHeader("Directory", name);
+        xhr.setRequestHeader("Directory", encodeURIComponent(name));
         xhr.send();
         xhr.onload = function () {
             if (xhr.status != 200) {

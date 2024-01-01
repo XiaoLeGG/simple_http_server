@@ -194,9 +194,9 @@ def file_explore_html(dir : str, user_name : str, abs_dir : str, uuid : ud.UUID=
     for file in abs_files:
         file_name = os.path.basename(file)
         if os.path.isdir(os.path.join(abs_dir, file)):
-            files.append(("/" + dir + "/" + file_name + "/", file_name + "/", True, -1))
+            files.append(("/" + dir.replace("%", "%25") + "/" + file_name.replace("%", "%25") + "/", file_name + "/", True, -1))
         else:
-            files.append(("/" + dir + "/" + file_name, file_name, False, os.path.getsize(os.path.join(abs_dir, file_name))))
+            files.append(("/" + dir.replace("%", "%25") + "/" + file_name.replace("%", "%25"), file_name, False, os.path.getsize(os.path.join(abs_dir, file_name))))
         
     if len(files) > 2:
         ret = [files[0]]
@@ -225,6 +225,7 @@ def normalize_and_validate_path(base_path : str, request_uri : str) -> str:
     return normalized_path
 
 def unquote_uri(s):
+    print(s)
     decoded_bytes = bytes()
     i = 0
     while i < len(s):
