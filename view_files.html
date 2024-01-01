@@ -413,10 +413,15 @@
     }
 
     function rename(file, id) {
+        if (!validateFileName(document.getElementById('file-' + id).value)) {
+            alert("Invalid file name!");
+            return;
+        }
         var xhr = new XMLHttpRequest();
         var name = document.getElementById('file-' + id).value;
         xhr.open("POST", "/upload?path={{ current_path }}/" + file, true);
         xhr.setRequestHeader("Rename", name);
+        // xhr.setRequestHeader("Rename", encodeURIComponent(name));
         xhr.send();
         xhr.onload = function () {
             if (xhr.status != 200) {
@@ -523,5 +528,14 @@
         document.getElementById("progress-bar").style.width = "0%";
         document.getElementById('uploadForm').classList.remove('hidden');
     }
+
+    function validateFileName(fileName) {
+        var reg_eng = /^[A-Za-z0-9.,;'"@%#\\\/^?*$+{}()\[\]><=\-:!]+$/;
+        var reg_win = new RegExp("[\\/:*?\"<>|]");
+        return reg_eng.test(fileName) && !reg_win.test(fileName);
+        // var reg_win = new RegExp("[\\/:*?\"<>|]");
+        // return !reg.test(fileName);
+    }
+
 </script>
 </html>
