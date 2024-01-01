@@ -225,7 +225,6 @@ def normalize_and_validate_path(base_path : str, request_uri : str) -> str:
     return normalized_path
 
 def unquote_uri(s):
-    print(s)
     decoded_bytes = bytes()
     i = 0
     while i < len(s):
